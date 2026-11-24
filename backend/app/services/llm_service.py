@@ -31,7 +31,7 @@ class LLMService:
             test_response = await self._call_gemini("Ping test. Respond with the single word 'READY'.", "You are an API diagnostic tester.")
             return {
                 "configured": True,
-                "provider": "gemini-1.5-flash",
+                "provider": "gemini-flash-lite-latest",
                 "gemini_active": True,
                 "test_response": test_response.strip(),
                 "message": "Google Gemini AI is verified, active, and responding to live queries."
@@ -57,7 +57,7 @@ class LLMService:
         return self._deterministic_fallback(prompt, system_prompt)
 
     async def _call_gemini(self, prompt: str, system_prompt: str) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        candidate_models = ["gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-2.5-flash-lite"]
         payload = {
             "contents": [
                 {
@@ -67,11 +67,22 @@ class LLMService:
                 }
             ]
         }
+        
+        last_err = None
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            for model in candidate_models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+                try:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+                    last_err = f"Model {model} returned HTTP {resp.status_code}: {resp.text}"
+                except Exception as e:
+                    last_err = str(e)
+                    continue
+
+        raise RuntimeError(f"All Gemini model candidates failed. Last error: {last_err}")
 
     def _deterministic_fallback(self, prompt: str, system_prompt: str) -> str:
         # High quality rule-based response generation
