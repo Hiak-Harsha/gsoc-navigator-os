@@ -7,9 +7,22 @@ from app.database import get_db
 from app.models.contribution import Contribution
 from app.schemas.contribution import ContributionOut, ContributionCreate, PRReviewRequest
 from app.services.pr_intelligence import pr_intelligence
+from app.services.pr_monitor import pr_monitor
 from app.api.routes_profile import get_or_create_default_user
 
 router = APIRouter(prefix="/contributions", tags=["Contributions & PR Intelligence"])
+
+@router.get("/live-status")
+def get_live_status(db: Session = Depends(get_db)):
+    """Fetch real-time GitHub status, CI checks, and bot reviews for all PRs."""
+    return pr_monitor.sync_all(db)
+
+@router.post("/sync-live-status")
+def sync_live_status(db: Session = Depends(get_db)):
+    """Force sync database state with live GitHub checks and merges."""
+    reports = pr_monitor.sync_all(db)
+    return {"status": "synchronized", "synced_count": len(reports), "reports": reports}
+
 
 @router.get("", response_model=List[ContributionOut])
 def list_contributions(db: Session = Depends(get_db)):

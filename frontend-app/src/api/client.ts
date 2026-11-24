@@ -63,6 +63,8 @@ export const api = {
 
   // Contributions & PR Intelligence
   getContributions: () => apiFetch<any[]>('/contributions'),
+  getPRLiveStatus: () => apiFetch<any[]>('/contributions/live-status'),
+  syncPRLiveStatus: () => apiFetch<any>('/contributions/sync-live-status', { method: 'POST' }),
   auditPR: (data: { pr_number: number; repository_id: number; diff_or_code: string }) => apiFetch<any>('/contributions/audit-pr', { method: 'POST', body: JSON.stringify(data) }),
   logFeedback: (id: number, feedback: string, newStatus: string) => apiFetch<any>(`/contributions/${id}/feedback?feedback_text=${encodeURIComponent(feedback)}&new_status=${encodeURIComponent(newStatus)}`, { method: 'POST' }),
 
