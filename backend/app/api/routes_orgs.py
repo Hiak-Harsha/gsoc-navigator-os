@@ -36,7 +36,10 @@ def seed_organizations_if_empty(db: Session, user):
                 db.add(repo)
             db.commit()
         else:
-            # Update score with new selection probability weighting
+            # Update score and probability metadata
+            for k in ["annual_slots", "competition_level", "target_contributions_required", "contribution_breakdown", "portfolio_role", "acceptance_probability_rating"]:
+                if k in org_data:
+                    setattr(existing, k, org_data[k])
             existing.fit_score = fit["fit_score"]
             existing.confidence_level = fit["confidence_level"]
             existing.fit_reasons = json.dumps(fit["fit_reasons"])

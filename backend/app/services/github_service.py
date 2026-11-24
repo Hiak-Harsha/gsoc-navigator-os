@@ -223,6 +223,14 @@ class GitHubService:
         else: # Default SymPy issues
             return [
                 {
+                    "number": 15859,
+                    "title": "pdf method of MarginalDistribution syntactically incorrect (NameError: expression)",
+                    "html_url": "https://github.com/sympy/sympy/issues/15859",
+                    "body": "In sympy/stats/joint_rv.py:327, MarginalDistribution.pdf refers to undefined variable 'expression' instead of 'expr' or 'expr.args[0]'. Needs test coverage and parameter cleanup.",
+                    "labels": ["stats", "easy to fix", "tests needed"],
+                    "state": "open"
+                },
+                {
                     "number": 24891,
                     "title": "Fix division by zero handling in simplify() for rational exponents",
                     "html_url": f"https://github.com/{owner}/{repo}/issues/24891",

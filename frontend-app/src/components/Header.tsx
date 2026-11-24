@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, RefreshCw, Radio } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Radio, Sparkles, Activity } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -16,6 +16,17 @@ export const Header: React.FC<HeaderProps> = ({ title, readinessScore, isSyncing
         <span className="text-[11px] font-mono bg-blue-950/80 text-blue-300 border border-blue-800/40 px-2 py-0.5 rounded-full flex items-center gap-1.5">
           <Radio className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
           Target: GSoC 2027
+        </span>
+      </div>
+
+      <div className="hidden lg:flex items-center gap-3">
+        <span className="text-[11px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
+          <Sparkles className="w-3 h-3 text-emerald-400" />
+          AI: Gemini Active
+        </span>
+        <span className="text-[11px] font-mono bg-indigo-950/80 text-indigo-300 border border-indigo-800/40 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
+          <Activity className="w-3 h-3 text-indigo-400 animate-pulse" />
+          Keep-Alive: 10m Ping
         </span>
       </div>
 

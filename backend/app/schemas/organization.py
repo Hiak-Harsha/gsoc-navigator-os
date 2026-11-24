@@ -44,6 +44,12 @@ class OrganizationBase(BaseModel):
     fit_reasons: str = "[]"
     skill_gaps: str = "[]"
     suggested_strategy: Optional[str] = None
+    annual_slots: Optional[str] = "10-15"
+    competition_level: Optional[str] = "Medium"
+    target_contributions_required: Optional[int] = 3
+    contribution_breakdown: Optional[str] = "1 starter bug fix + 1 subsystem PR + 1 proposal draft"
+    portfolio_role: Optional[str] = "Primary Target"
+    acceptance_probability_rating: Optional[str] = "Very High"
     is_shortlisted: bool = False
 
 class OrganizationCreate(OrganizationBase):

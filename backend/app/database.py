@@ -24,3 +24,24 @@ def get_db():
 def init_db():
     from app import models # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Safe evolution for SQLite columns
+    if settings.DATABASE_URL.startswith("sqlite"):
+        try:
+            with engine.connect() as conn:
+                res = conn.exec_driver_sql("PRAGMA table_info(organizations)")
+                existing_cols = [row[1] for row in res.fetchall()]
+                new_cols = {
+                    "annual_slots": "TEXT DEFAULT '10-15'",
+                    "competition_level": "TEXT DEFAULT 'Medium'",
+                    "target_contributions_required": "INTEGER DEFAULT 3",
+                    "contribution_breakdown": "TEXT DEFAULT '1 starter bug fix + 1 subsystem PR + 1 proposal draft'",
+                    "portfolio_role": "TEXT DEFAULT 'Primary Target'",
+                    "acceptance_probability_rating": "TEXT DEFAULT 'Very High'"
+                }
+                for col, col_type in new_cols.items():
+                    if col not in existing_cols:
+                        conn.exec_driver_sql(f"ALTER TABLE organizations ADD COLUMN {col} {col_type}")
+                conn.commit()
+        except Exception as e:
+            print(f"[DB Evolution Notice] {e}")

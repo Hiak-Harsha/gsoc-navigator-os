@@ -50,6 +50,12 @@ export interface Organization {
   fit_reasons: string;
   skill_gaps: string;
   suggested_strategy: string | null;
+  annual_slots?: string;
+  competition_level?: string;
+  target_contributions_required?: number;
+  contribution_breakdown?: string;
+  portfolio_role?: string;
+  acceptance_probability_rating?: string;
   is_shortlisted: boolean;
   repositories: Repository[];
 }

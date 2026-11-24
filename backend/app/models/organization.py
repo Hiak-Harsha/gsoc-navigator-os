@@ -32,6 +32,14 @@ class Organization(Base):
     skill_gaps = Column(Text, default="[]")
     suggested_strategy = Column(Text, nullable=True)
     
+    # Selection Probability and Contribution Targeting
+    annual_slots = Column(String(50), default="10-15")
+    competition_level = Column(String(50), default="Medium")
+    target_contributions_required = Column(Integer, default=3)
+    contribution_breakdown = Column(String(500), default="1 starter bug fix + 1 subsystem PR + 1 proposal draft")
+    portfolio_role = Column(String(50), default="Primary Target")
+    acceptance_probability_rating = Column(String(50), default="Very High")
+    
     is_shortlisted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

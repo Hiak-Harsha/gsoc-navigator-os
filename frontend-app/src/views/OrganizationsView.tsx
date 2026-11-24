@@ -162,6 +162,31 @@ export const OrganizationsView: React.FC<{ onNavigate: (view: string) => void }>
               {/* Description */}
               <p className="text-xs text-slate-300 leading-relaxed">{org.description}</p>
 
+              {/* Strategic GSoC Selection Targets & Probability */}
+              <div className="bg-[#10192b] border border-blue-900/50 rounded-lg p-3.5 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono uppercase font-bold text-amber-400 bg-amber-950/70 border border-amber-800/40 px-2 py-0.5 rounded">
+                      Role: {org.portfolio_role || 'Primary Target'}
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
+                      Slots: {org.annual_slots || '10-18 slots/yr'}
+                    </span>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded">
+                      Competition: {org.competition_level || 'Medium'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-blue-300 font-semibold">
+                    🎯 Target: {org.target_contributions_required || 3} Merged PRs
+                  </span>
+                </div>
+
+                <div className="text-[11px] text-slate-300 bg-[#162238] p-2 rounded border border-[#253755]">
+                  <strong className="text-blue-300 font-medium">How to Win Selection: </strong>
+                  <span>{org.contribution_breakdown || '1 Starter Bug Fix (L1/L2) + 1 Subsystem Logic PR (L3) + 1 Proposal Draft'}</span>
+                </div>
+              </div>
+
               {/* Languages & Topics */}
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-1.5">
