@@ -50,6 +50,29 @@ sunpy_lb = {
     ]
 }
 
+cern_lb = {
+    "module": "vector.backends._numba_object (High Energy Physics / JIT Vector Overloading Backend)",
+    "issue_number": 512,
+    "issue_title": "Possibly using variable before assignment warnings in Numba overloader functions",
+    "what_was_broken": "In src/vector/backends/_numba_object.py, dispatch registration methods (add_binary_method, add_tolerance_method, and add_isclose_method) overload mathematical and comparison operations across vector types in Numba JIT compiler. The overloader functions used cascading if/elif branches that assigned result expressions to variables (out, result). In cases where unsupported operand types or coordinate combinations were passed, the branches were skipped without assigning, causing static analysis and Numba JIT warnings: Possibly using variable out before assignment (E0606). If reached at runtime, it would cause an UnboundLocalError rather than a proper Numba TypingError.",
+    "real_world_impact": "High Energy Physics experiments at CERN (CMS, ATLAS, LHCb) process billions of particle collision events with 4-momentum Lorentz vectors (px, py, pz, E) using Numba JIT compilation. Compiler warnings degrade build logs, and failing to raise TypingError prevents Numba multiple dispatch from exploring alternative overload candidates or giving physicists actionable compile-time diagnostics.",
+    "how_to_solve_without_ai": [
+        "Step 1 (Reproduction & Grep): Use git grep -n \"out =\" src/vector/backends/_numba_object.py to inspect overloader generators and locate where variable assignment occurs inside conditional branches without a terminating else fallback.",
+        "Step 2 (Understand Numba Overload Protocol): In Numba @overload API, when an overloaded function is invoked with unsupported argument types, the overload function MUST raise numba.TypingError (or numba.core.errors.TypingError). This signals to Numba typing engine that no valid implementation exists.",
+        "Step 3 (Trace Dispatch Factories): Inspect add_binary_method, add_tolerance_method, and add_isclose_method to map out all coordinate matching branches.",
+        "Step 4 (Implement Guard & Fallback): In each generator function, append an explicit else: clause raising numba.TypingError with descriptive coordinate and type signatures.",
+        "Step 5 (Verification & Linting): Run ruff check on the modified file and execute pytest tests/test_issues.py and pytest tests/backends to ensure valid operations continue to dispatch cleanly."
+    ],
+    "root_cause_analysis": "The overloaders were written assuming that previous type check guards would filter out unsupported coordinate combinations. However, Python and Numba static AST analysis inspects all lexical paths. Because there was no else block, the path where none of the conditions matched left out unbound at the return out statement.",
+    "code_solution_explained": "In src/vector/backends/_numba_object.py, we added explicit else blocks in add_binary_method, add_tolerance_method, and add_isclose_method that raise numba.TypingError with a descriptive error message indicating the unsupported types and operation name.",
+    "testing_strategy": "1. Verified with ruff check and ruff format --check on _numba_object.py (0 errors).\n2. Executed pytest tests/test_issues.py and pytest tests/backends/ (39 passed).\n3. Verified in origin git remote that the branch fix-numba-variable-assignment-warnings contains the clean commit.",
+    "interview_talking_points": [
+        "I contributed to CERN-HSF (High Energy Physics Software Foundation) on scikit-hep/vector, which handles 2D, 3D, and Lorentz vector kinematics for the Large Hadron Collider.",
+        "I resolved an unbound variable compiler defect in the Numba JIT acceleration engine where overloader dispatch functions lacked exhaustive type guards, causing E0606 static analysis warnings and uncaught runtime failures.",
+        "I implemented explicit numba.TypingError fallback branches across dispatch factories (add_binary_method, add_tolerance_method, add_isclose_method), guaranteeing deterministic JIT compilation and clean error diagnostics for HEP researchers."
+    ]
+}
+
 conn = sqlite3.connect("C:/Users/madha/gsoc-navigator-os/backend/gsoc_navigator.db")
 c = conn.cursor()
 
@@ -90,6 +113,23 @@ c.execute("""
     json.dumps(["sunpy/coordinates/utils.py", "sunpy/map/maputils.py", "sunpy/coordinates/tests/test_utils.py", "sunpy/map/tests/test_maputils.py", "changelog/8926.deprecation.rst"]),
     json.dumps(["SunPy Coordinates Engine", "Astropy Units & Quantities", "API Deprecation Patterns", "Backward Compatibility", "Towncrier Release Notes"]),
     json.dumps(sunpy_lb)
+))
+
+# Update or insert PR 766 (CERN Vector)
+c.execute("""
+    UPDATE contributions 
+    SET pr_number = 766,
+        pr_title = 'fix(numba): add TypingError fallback guards for unassigned variables in overloader methods (#512)',
+        pr_url = 'https://github.com/scikit-hep/vector/pull/766',
+        branch_name = 'fix-numba-variable-assignment-warnings',
+        files_changed = ?,
+        demonstrated_skills = ?,
+        learning_breakdown = ?
+    WHERE pr_number = 766
+""", (
+    json.dumps(["src/vector/backends/_numba_object.py"]),
+    json.dumps(["Python", "Numba JIT", "High Energy Physics", "AST Static Analysis", "scikit-hep", "CERN-HSF"]),
+    json.dumps(cern_lb)
 ))
 
 conn.commit()
