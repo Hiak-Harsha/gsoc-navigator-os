@@ -19,6 +19,7 @@ class ContributionBase(BaseModel):
     code_quality_assessment: Optional[str] = None
     recurring_weaknesses_identified: str = "[]"
     demonstrated_skills: str = "[]"
+    learning_breakdown: Optional[str] = None
 
 class ContributionCreate(ContributionBase):
     pass

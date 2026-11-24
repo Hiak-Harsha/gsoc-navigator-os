@@ -30,6 +30,7 @@ class Contribution(Base):
     code_quality_assessment = Column(Text, nullable=True)
     recurring_weaknesses_identified = Column(Text, default="[]")
     demonstrated_skills = Column(Text, default="[]")
+    learning_breakdown = Column(Text, nullable=True)
     
     date_started = Column(DateTime, default=utc_now)
     date_merged = Column(DateTime, nullable=True)

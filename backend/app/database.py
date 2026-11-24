@@ -42,6 +42,12 @@ def init_db():
                 for col, col_type in new_cols.items():
                     if col not in existing_cols:
                         conn.exec_driver_sql(f"ALTER TABLE organizations ADD COLUMN {col} {col_type}")
+
+                res_c = conn.exec_driver_sql("PRAGMA table_info(contributions)")
+                existing_c_cols = [row[1] for row in res_c.fetchall()]
+                if "learning_breakdown" not in existing_c_cols:
+                    conn.exec_driver_sql("ALTER TABLE contributions ADD COLUMN learning_breakdown TEXT")
+
                 conn.commit()
         except Exception as e:
             print(f"[DB Evolution Notice] {e}")
