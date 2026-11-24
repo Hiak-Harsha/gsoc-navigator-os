@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: gsoc-navigator-os
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: MONITORING_INTERVAL_SECONDS
+        value: 300
