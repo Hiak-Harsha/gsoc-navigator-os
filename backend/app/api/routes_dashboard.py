@@ -13,6 +13,7 @@ from app.services.strategy_service import strategy_service
 from app.api.routes_profile import get_or_create_default_user
 from app.api.routes_orgs import seed_organizations_if_empty
 from app.api.routes_proposals import list_proposals
+from app.api.routes_contributions import list_contributions
 
 router = APIRouter(prefix="/dashboard", tags=["Execution Command Center"])
 
@@ -59,6 +60,7 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
     seed_organizations_if_empty(db, user)
     seed_default_tasks_if_empty(db, user)
     list_proposals(db) # Pre-seeds initial proposal if empty
+    list_contributions(db) # Pre-seeds contribution timeline if empty
 
     shortlisted_orgs = db.query(Organization).filter(Organization.is_shortlisted == True).count()
     total_contributions = db.query(Contribution).filter(Contribution.user_id == user.id).count()
