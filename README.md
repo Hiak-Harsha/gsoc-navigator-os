@@ -1,9 +1,28 @@
 # GSoC Navigator OS 2027
 ## An Intelligent, Evidence-Based Open-Source & Google Summer of Code Preparation Platform
 
+[![CI/CD Pipeline](https://github.com/Hiak-Harsha/gsoc-navigator-os/actions/workflows/ci.yml/badge.svg)](https://github.com/Hiak-Harsha/gsoc-navigator-os/actions)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Hiak-Harsha/gsoc-navigator-os)
+
 **Target Contributor Profile:** Madhava (B.Tech CSE '28, GITAM University, Visakhapatnam)  
 **Primary Program:** Google Summer of Code (GSoC) 2027  
 **Core Mission:** Move from language fundamentals to becoming an independent, credible, and technically capable open-source contributor.
+
+---
+
+## 🚀 Live Cloud Deployment (Online Server)
+
+This project is pre-configured with a multi-stage Docker build and a `render.yaml` infrastructure blueprint for **free 1-click cloud hosting** on Render.com or Railway.
+
+### Option 1: 1-Click Render.com Deployment (Recommended)
+1. Click the **[Deploy to Render](https://render.com/deploy?repo=https://github.com/Hiak-Harsha/gsoc-navigator-os)** button or visit [Render Blueprint Deploy](https://render.com/deploy?repo=https://github.com/Hiak-Harsha/gsoc-navigator-os).
+2. Sign in with your GitHub account (`Hiak-Harsha`).
+3. Click **Apply / Deploy**. Render will automatically build the multi-stage Docker image (compiling the React frontend and launching the FastAPI backend) and provide a permanent public HTTPS live URL (`https://gsoc-navigator-os.onrender.com`).
+
+### Option 2: Railway Deployment
+1. Go to [Railway.app](https://railway.app) and click **New Project** -> **Deploy from GitHub repo**.
+2. Select `Hiak-Harsha/gsoc-navigator-os`.
+3. Railway will automatically detect the `Dockerfile` and spin up the live service with a public URL.
 
 ---
 
