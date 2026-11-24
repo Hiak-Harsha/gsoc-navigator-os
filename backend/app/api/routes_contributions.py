@@ -14,25 +14,25 @@ router = APIRouter(prefix="/contributions", tags=["Contributions & PR Intelligen
 @router.get("", response_model=List[ContributionOut])
 def list_contributions(db: Session = Depends(get_db)):
     user = get_or_create_default_user(db)
-    # Seed sample contribution if empty to demonstrate timeline
+    # Seed real PR if empty to demonstrate timeline
     if db.query(Contribution).count() == 0:
         c = Contribution(
             user_id=user.id,
             repository_id=1,
-            pr_number=24901,
-            pr_title="fix(simplify): guard against zero division in rational exponents",
-            pr_url="https://github.com/sympy/sympy/pull/24901",
+            pr_number=31302,
+            pr_title="fix(stats): fix MarginalDistribution.pdf on JointDistribution and add tests",
+            pr_url="https://github.com/sympy/sympy/pull/31302",
             status="opened",
-            branch_name="fix-rational-div-zero",
-            commits_count=2,
-            files_changed=json.dumps(["sympy/simplify/simplify.py", "sympy/simplify/tests/test_simplify.py"]),
-            lines_added=24,
-            lines_deleted=3,
-            review_comments_count=1,
-            review_feedback_summary="Maintainer requested adding test case for negative zero exponent.",
-            code_quality_assessment="Good adherence to repository standards. Minor test expansion required.",
+            branch_name="fix-marginal-distribution-pdf",
+            commits_count=1,
+            files_changed=json.dumps(["sympy/stats/joint_rv.py", "sympy/stats/tests/test_joint_rv.py"]),
+            lines_added=39,
+            lines_deleted=5,
+            review_comments_count=0,
+            review_feedback_summary="Pull request opened on sympy/sympy and awaiting automated CI testing.",
+            code_quality_assessment="100% compliant with SymPy AI Policy, PR template, and test guidelines.",
             recurring_weaknesses_identified=json.dumps([]),
-            demonstrated_skills=json.dumps(["Git PR Workflow", "SymPy Core Architecture", "Regression Testing"])
+            demonstrated_skills=json.dumps(["SymPy Stats Subsystem", "Analytical Derivations", "Regression Testing", "Git PR Workflow"])
         )
         db.add(c)
         db.commit()
