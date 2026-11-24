@@ -16,6 +16,35 @@ class LLMService:
         self.gemini_key = settings.GEMINI_API_KEY
         self.openai_key = settings.OPENAI_API_KEY
 
+    async def check_health(self) -> Dict[str, Any]:
+        """Diagnose AI service status and test live Gemini connection if configured."""
+        if not self.gemini_key:
+            return {
+                "configured": False,
+                "provider": "deterministic_fallback",
+                "gemini_active": False,
+                "message": "GEMINI_API_KEY is not configured in environment variables. Operating with built-in heuristic/rule-based engine.",
+                "setup_guide": "Get a free key from https://aistudio.google.com and set GEMINI_API_KEY in Render Environment."
+            }
+        
+        try:
+            test_response = await self._call_gemini("Ping test. Respond with the single word 'READY'.", "You are an API diagnostic tester.")
+            return {
+                "configured": True,
+                "provider": "gemini-1.5-flash",
+                "gemini_active": True,
+                "test_response": test_response.strip(),
+                "message": "Google Gemini AI is verified, active, and responding to live queries."
+            }
+        except Exception as e:
+            return {
+                "configured": True,
+                "provider": "deterministic_fallback",
+                "gemini_active": False,
+                "error": str(e),
+                "message": f"Gemini key present but API call failed: {e}. Falling back to deterministic engine."
+            }
+
     async def analyze_text(self, prompt: str, system_prompt: str = "") -> str:
         # Check if Gemini key is available
         if self.gemini_key and (self.provider in ["auto", "gemini"]):

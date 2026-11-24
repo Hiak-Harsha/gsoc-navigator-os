@@ -24,6 +24,9 @@ def seed_organizations_if_empty(db: Session, user):
             org.fit_reasons = json.dumps(fit["fit_reasons"])
             org.skill_gaps = json.dumps(fit["skill_gaps"])
             org.suggested_strategy = fit["suggested_strategy"]
+            # Pre-shortlist the top 3 highest-probability, verified mentor organizations
+            if slug in ["sympy", "sunpy", "python-software-foundation"]:
+                org.is_shortlisted = True
             db.add(org)
             db.commit()
             db.refresh(org)

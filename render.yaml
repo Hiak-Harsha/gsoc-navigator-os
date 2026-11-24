@@ -10,3 +10,5 @@ services:
         value: production
       - key: MONITORING_INTERVAL_SECONDS
         value: 300
+      - key: KEEP_ALIVE_URL
+        value: https://gsoc-navigator-os.onrender.com
