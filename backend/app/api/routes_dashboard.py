@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from app.database import get_db
 from app.models.user import User
@@ -8,7 +9,7 @@ from app.models.monitoring import Task, Notification
 from app.models.organization import Organization
 from app.models.contribution import Contribution
 from app.models.proposal import Proposal
-from app.schemas.monitoring import TaskOut, TaskCreate, TaskUpdate
+from app.schemas.monitoring import TaskOut
 from app.services.strategy_service import strategy_service
 from app.api.routes_profile import get_or_create_default_user
 from app.api.routes_orgs import seed_organizations_if_empty
@@ -16,6 +17,12 @@ from app.api.routes_proposals import list_proposals
 from app.api.routes_contributions import list_contributions
 
 router = APIRouter(prefix="/dashboard", tags=["Execution Command Center"])
+
+
+class AIChatRequest(BaseModel):
+    question: str
+    history: Optional[List[Dict[str, str]]] = None
+
 
 def seed_default_tasks_if_empty(db: Session, user: User):
     if db.query(Task).count() == 0:
@@ -28,7 +35,7 @@ def seed_default_tasks_if_empty(db: Session, user: User):
                 reason="Hands-on environment setup is Stage 1 requirement.",
                 estimated_hours=1.5,
                 status="pending",
-                completion_criteria="`pytest sympy/core` runs green without errors."
+                completion_criteria="`pytest sympy/core` runs green without errors.",
             ),
             Task(
                 user_id=user.id,
@@ -38,7 +45,7 @@ def seed_default_tasks_if_empty(db: Session, user: User):
                 reason="Identified as top 'Start Now' match for your profile.",
                 estimated_hours=3.0,
                 status="pending",
-                completion_criteria="Reproduce bug with minimal 3-line script."
+                completion_criteria="Reproduce bug with minimal 3-line script.",
             ),
             Task(
                 user_id=user.id,
@@ -48,25 +55,32 @@ def seed_default_tasks_if_empty(db: Session, user: User):
                 reason="Proposals with buffer weeks score 15% higher in mentor reviews.",
                 estimated_hours=2.0,
                 status="pending",
-                completion_criteria="Proposal audit score passes 80%."
-            )
+                completion_criteria="Proposal audit score passes 80%.",
+            ),
         ]
         db.add_all(tasks)
         db.commit()
+
 
 @router.get("/overview")
 def get_dashboard_overview(db: Session = Depends(get_db)):
     user = get_or_create_default_user(db)
     seed_organizations_if_empty(db, user)
     seed_default_tasks_if_empty(db, user)
-    list_proposals(db) # Pre-seeds initial proposal if empty
-    list_contributions(db) # Pre-seeds contribution timeline if empty
+    list_proposals(db)
+    list_contributions(db)
 
     shortlisted_orgs = db.query(Organization).filter(Organization.is_shortlisted == True).count()
     total_contributions = db.query(Contribution).filter(Contribution.user_id == user.id).count()
     proposals_count = db.query(Proposal).filter(Proposal.user_id == user.id).count()
-    unread_notifications = db.query(Notification).filter(Notification.user_id == user.id, Notification.is_read == False).count()
-    pending_tasks = db.query(Task).filter(Task.user_id == user.id, Task.status == "pending").count()
+    unread_notifications = (
+        db.query(Notification)
+        .filter(Notification.user_id == user.id, Notification.is_read == False)
+        .count()
+    )
+    pending_tasks = (
+        db.query(Task).filter(Task.user_id == user.id, Task.status == "pending").count()
+    )
 
     return {
         "user": {
@@ -74,37 +88,66 @@ def get_dashboard_overview(db: Session = Depends(get_db)):
             "stage": user.current_stage,
             "readiness_score": user.overall_readiness_score,
             "university": user.university,
-            "grad_year": user.graduation_year
+            "grad_year": user.graduation_year,
         },
         "stats": {
             "shortlisted_orgs": shortlisted_orgs,
             "total_contributions": total_contributions,
             "proposals_drafted": proposals_count,
             "unread_notifications": unread_notifications,
-            "pending_tasks": pending_tasks
+            "pending_tasks": pending_tasks,
         },
         "system_status": {
             "monitoring_active": True,
             "sources_tracked": 3,
-            "current_target_year": 2027
-        }
+            "current_target_year": 2027,
+        },
     }
+
 
 @router.get("/briefing")
 def get_daily_briefing(db: Session = Depends(get_db)):
     user = get_or_create_default_user(db)
     return strategy_service.generate_daily_briefing(db, user)
 
+
 @router.get("/weekly-review")
 def get_weekly_review(db: Session = Depends(get_db)):
     user = get_or_create_default_user(db)
     return strategy_service.generate_weekly_review(db, user)
 
+
+@router.get("/context-snapshot")
+def get_context_snapshot(db: Session = Depends(get_db)):
+    user = get_or_create_default_user(db)
+    return strategy_service.build_portfolio_snapshot(db, user)
+
+
+@router.get("/ai-suggestions")
+async def get_ai_suggestions(db: Session = Depends(get_db)):
+    user = get_or_create_default_user(db)
+    return await strategy_service.generate_ai_suggestions(db, user)
+
+
+@router.post("/ai-chat")
+async def post_ai_chat(payload: AIChatRequest, db: Session = Depends(get_db)):
+    user = get_or_create_default_user(db)
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    return await strategy_service.ask_copilot(db, user, payload.question.strip(), payload.history)
+
+
 @router.get("/tasks", response_model=List[TaskOut])
 def list_tasks(db: Session = Depends(get_db)):
     user = get_or_create_default_user(db)
     seed_default_tasks_if_empty(db, user)
-    return db.query(Task).filter(Task.user_id == user.id).order_by(Task.created_at.desc()).all()
+    return (
+        db.query(Task)
+        .filter(Task.user_id == user.id)
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+
 
 @router.post("/tasks/{task_id}/status")
 def update_task_status(task_id: int, status: str, db: Session = Depends(get_db)):

@@ -15,9 +15,11 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET", None)
     
     # AI / LLM Configuration
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "auto") # auto, gemini, openai, heuristic
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "auto") # auto, ollama, gemini, heuristic
     
     # Background Monitoring
     MONITORING_INTERVAL_SECONDS: int = 300 # 5 minutes default

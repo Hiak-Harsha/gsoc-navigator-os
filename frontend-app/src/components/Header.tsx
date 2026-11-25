@@ -1,7 +1,6 @@
 import React from 'react';
-import { Bell, PanelLeftOpen, Radio, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { Bell, BellRing, Bot, PanelLeftOpen, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { ShimmerButton } from './magic/ShimmerButton';
 import { cn } from '../lib/utils';
 
@@ -11,8 +10,12 @@ export interface HeaderProps {
   isSyncing: boolean;
   sidebarOpen: boolean;
   unreadNotifications: number;
+  ollamaActive?: boolean;
+  desktopAlertsEnabled?: boolean;
   onOpenSidebar: () => void;
   onOpenCommandPalette: () => void;
+  onOpenCopilot: () => void;
+  onToggleDesktopAlerts: () => void;
   onRefresh: () => void;
   onOpenNotifications: () => void;
 }
@@ -23,15 +26,19 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   sidebarOpen,
   unreadNotifications,
+  ollamaActive = false,
+  desktopAlertsEnabled = false,
   onOpenSidebar,
   onOpenCommandPalette,
+  onOpenCopilot,
+  onToggleDesktopAlerts,
   onRefresh,
   onOpenNotifications,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-2.5 border-b bg-[var(--surface-glass)] px-5 py-3 backdrop-blur-xl">
       {/* Left: Sidebar Toggle + Command Search Pill */}
-      <div className="flex min-w-[220px] flex-1 items-center gap-2.5 max-w-[520px]">
+      <div className="flex min-w-[210px] flex-1 items-center gap-2.5 max-w-[480px]">
         {!sidebarOpen && (
           <Button
             variant="secondary"
@@ -52,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="flex min-w-0 items-center gap-2">
             <Search className="h-4 w-4 shrink-0 text-[var(--ink-muted)]" />
             <span className="truncate text-[13px] text-[var(--ink-muted)]">
-              <strong className="font-semibold text-[var(--ink)]">{title}</strong> · Jump to any view, PR, org, or issue...
+              <strong className="font-semibold text-[var(--ink)]">{title}</strong> · Jump to any view, PR, or issue...
             </span>
           </span>
           <kbd className="shrink-0 rounded border bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-muted)]">
@@ -61,37 +68,44 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Telemetry Pills, Readiness Meter & Primary CTA */}
+      {/* Right: Copilot, Desktop Alerts, Readiness, Notifications & Sync */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="hidden xl:flex items-center gap-2">
-          <Badge tone="emerald">
-            <Radio className="h-3 w-3 animate-pulse" />
-            Target: GSoC 2027
-          </Badge>
-          <Badge tone="accent">
-            <Sparkles className="h-3 w-3" />
-            PR Sentinel Active
-          </Badge>
-        </div>
-
         {/* Readiness Meter Pill */}
-        <div className="hidden sm:flex items-center gap-2.5 rounded-lg border bg-[var(--surface)] px-3 min-h-[40px] shadow-apple">
+        <div className="hidden xl:flex items-center gap-2.5 rounded-lg border bg-[var(--surface)] px-3 min-h-[40px] shadow-apple">
           <ShieldCheck className="h-4 w-4 text-[var(--accent-bright)] shrink-0" />
-          <div className="w-20 overflow-hidden rounded-full bg-[var(--input-bg)] h-1.5">
+          <div className="w-16 overflow-hidden rounded-full bg-[var(--input-bg)] h-1.5">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--emerald)] transition-all duration-500"
               style={{ width: `${Math.min(100, readinessScore)}%` }}
             />
           </div>
-          <span className="font-mono text-[11.5px] font-semibold text-[var(--ink)]">
-            {readinessScore}%
-          </span>
+          <span className="font-mono text-[11.5px] font-semibold text-[var(--ink)]">{readinessScore}%</span>
         </div>
+
+        <Button
+          variant={ollamaActive ? 'emerald' : 'secondary'}
+          onClick={onOpenCopilot}
+          title="Open Ollama GSoC Copilot & Proactive Suggestions"
+        >
+          <Bot className="h-4 w-4" />
+          <span>{ollamaActive ? 'Ollama Copilot' : 'AI Copilot'}</span>
+        </Button>
 
         <Button
           variant="secondary"
           size="icon"
-          title="Notifications"
+          title={desktopAlertsEnabled ? 'Desktop Notifications Active' : 'Enable Desktop PR Notifications'}
+          aria-label="Toggle desktop notifications"
+          onClick={onToggleDesktopAlerts}
+          className={desktopAlertsEnabled ? 'border-[color:var(--emerald)]/40 text-[var(--emerald)]' : ''}
+        >
+          <BellRing className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="icon"
+          title="Notifications Center"
           aria-label="Open notifications"
           onClick={onOpenNotifications}
           className="relative"

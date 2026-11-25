@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { CommandPalette } from './components/CommandPalette';
+import { CopilotSheet } from './components/CopilotSheet';
 import { api } from './api/client';
+import { probeBrowserOllama } from './api/ollamaBridge';
 import { cn } from './lib/utils';
 
 // Views
@@ -29,6 +31,7 @@ export function App() {
   });
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('gn_sidebar_open') !== 'false');
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   const [readinessScore, setReadinessScore] = useState(18.5);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -38,6 +41,12 @@ export function App() {
   const [issues, setIssues] = useState<any[]>([]);
   const [activeCoachingIssueId, setActiveCoachingIssueId] = useState<number | undefined>(undefined);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [ollamaActive, setOllamaActive] = useState(false);
+  const [desktopAlertsEnabled, setDesktopAlertsEnabled] = useState(() => {
+    return typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+  });
+  const seenNotificationIdsRef = useRef<Set<number>>(new Set());
+
   const [toast, setToast] = useState<{ msg: string; error: boolean; visible: boolean }>({
     msg: '',
     error: false,
@@ -57,18 +66,43 @@ export function App() {
 
   const showToast = useCallback((msg: string, error = false) => {
     setToast({ msg, error, visible: true });
-    window.setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2800);
+    window.setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000);
+  }, []);
+
+  const fireDesktopAlertIfNew = useCallback((notifs: any[]) => {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+      notifs.forEach((n) => seenNotificationIdsRef.current.add(n.id));
+      return;
+    }
+
+    const initialLoad = seenNotificationIdsRef.current.size === 0;
+    notifs.forEach((n) => {
+      const isNew = !seenNotificationIdsRef.current.has(n.id);
+      seenNotificationIdsRef.current.add(n.id);
+      if (isNew && !initialLoad && (n.priority === 'critical' || n.priority === 'high')) {
+        try {
+          new Notification(n.title, {
+            body: `${n.summary}${n.action_required ? ` — ${n.action_required}` : ''}`,
+          });
+        } catch {
+          // Ignore browser restrictions on background focus
+        }
+      }
+    });
   }, []);
 
   const refreshCoreState = useCallback(async () => {
     try {
-      const [profile, notifs, contribs, orgs, issueList] = await Promise.all([
+      const [profile, notifs, contribs, orgs, issueList, aiStatus, browserOllama] = await Promise.all([
         api.getProfile(),
         api.getNotifications(true),
         api.getContributions().catch(() => []),
         api.getOrganizations().catch(() => []),
         api.getIssues().catch(() => []),
+        api.getAiStatus().catch(() => null),
+        probeBrowserOllama(),
       ]);
+
       if (profile) {
         setUserProfile(profile);
         if (profile.overall_readiness_score !== undefined) {
@@ -76,17 +110,24 @@ export function App() {
         }
       }
       setUnreadNotifications(notifs.length);
+      fireDesktopAlertIfNew(notifs);
       setContributions(contribs);
       setOrganizations(orgs);
       setIssues(issueList);
+      setOllamaActive(Boolean(aiStatus?.ai_status?.ollama_active || browserOllama.active));
     } catch (err) {
       console.error('Error refreshing core state:', err);
     }
-  }, []);
+  }, [fireDesktopAlertIfNew]);
 
   useEffect(() => {
     refreshCoreState();
   }, [currentView, refreshCoreState]);
+
+  useEffect(() => {
+    const timer = window.setInterval(refreshCoreState, 60000);
+    return () => window.clearInterval(timer);
+  }, [refreshCoreState]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,6 +141,28 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const handleToggleDesktopAlerts = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      showToast('Browser notifications are not supported in this browser.', true);
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      setDesktopAlertsEnabled((prev) => !prev);
+      showToast(!desktopAlertsEnabled ? 'Desktop notifications enabled' : 'Desktop notifications muted');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      setDesktopAlertsEnabled(true);
+      showToast('Desktop notifications enabled for PR CI & Merge alerts');
+      new Notification('GSoC Navigator OS', {
+        body: 'Live PR & Ollama CI alerts are now active on your desktop.',
+      });
+    } else {
+      showToast('Notification permission denied in browser settings.', true);
+    }
+  };
 
   const handleGlobalSync = async () => {
     try {
@@ -162,7 +225,11 @@ export function App() {
           onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
           onCollapse={() => setSidebarOpen(false)}
           userName={userProfile?.name || 'Madhava'}
-          userMeta={userProfile ? `${userProfile.university || 'GITAM'} · '${String(userProfile.graduation_year || 2028).slice(-2)}` : "GITAM · B.Tech CSE '28"}
+          userMeta={
+            userProfile
+              ? `${userProfile.university || 'GITAM'} · '${String(userProfile.graduation_year || 2028).slice(-2)}`
+              : "GITAM · B.Tech CSE '28"
+          }
           readinessScore={readinessScore}
         />
       )}
@@ -174,15 +241,23 @@ export function App() {
           isSyncing={isSyncing}
           sidebarOpen={sidebarOpen}
           unreadNotifications={unreadNotifications}
+          ollamaActive={ollamaActive}
+          desktopAlertsEnabled={desktopAlertsEnabled}
           onOpenSidebar={() => setSidebarOpen(true)}
           onOpenCommandPalette={() => setCmdOpen(true)}
+          onOpenCopilot={() => setCopilotOpen(true)}
+          onToggleDesktopAlerts={handleToggleDesktopAlerts}
           onRefresh={handleGlobalSync}
           onOpenNotifications={() => setCurrentView('notifications')}
         />
 
         <main className="mx-auto w-full max-w-[1460px] flex-1 p-5 sm:p-6">
           {currentView === 'overview' && (
-            <OverviewView onNavigate={setCurrentView} showToast={showToast} />
+            <OverviewView
+              onNavigate={setCurrentView}
+              onOpenCopilot={() => setCopilotOpen(true)}
+              showToast={showToast}
+            />
           )}
           {currentView === 'gsoc-intel' && <GSoCIntelligenceView />}
           {currentView === 'organizations' && (
@@ -198,7 +273,9 @@ export function App() {
               }}
             />
           )}
-          {currentView === 'mentor' && <ContributionMentorView activeIssueId={activeCoachingIssueId} showToast={showToast} />}
+          {currentView === 'mentor' && (
+            <ContributionMentorView activeIssueId={activeCoachingIssueId} showToast={showToast} />
+          )}
           {currentView === 'prs' && <PullRequestsView showToast={showToast} />}
           {currentView === 'skills' && <SkillDevelopmentView />}
           {currentView === 'project-ideas' && <ProjectIdeasView onNavigate={setCurrentView} />}
@@ -220,6 +297,13 @@ export function App() {
           setActiveCoachingIssueId(issueId);
           setCurrentView('mentor');
         }}
+      />
+
+      <CopilotSheet
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        onNavigate={setCurrentView}
+        showToast={showToast}
       />
 
       {/* Fluent-Apple Toast Notification */}

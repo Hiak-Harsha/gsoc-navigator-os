@@ -11,9 +11,10 @@ from app.database import init_db, SessionLocal
 from app.models.monitoring import MonitoredSource
 from app.services.monitoring_service import monitoring_service
 from app.services.llm_service import llm_service
+from app.services.pr_monitor import pr_monitor
 
 # Routers
-from app.api.routes_profile import router as profile_router
+from app.api.routes_profile import router as profile_router, get_or_create_default_user
 from app.api.routes_gsoc import router as gsoc_router
 from app.api.routes_orgs import router as orgs_router
 from app.api.routes_repos import router as repos_router
@@ -26,16 +27,18 @@ from app.api.routes_dashboard import router as dashboard_router
 
 # Background Worker Loop
 async def background_monitoring_worker():
-    """Persistent background task that monitors official sources periodically."""
+    """Persistent background task that monitors official sources and live PR checks periodically."""
     print("[GSoC Navigator OS Worker] Background monitoring service started.")
     while True:
         try:
             db = SessionLocal()
             try:
+                user = get_or_create_default_user(db)
                 monitoring_service.seed_default_sources(db)
-                sources = db.query(monitoring_service.MonitoredSource).all()
+                sources = db.query(MonitoredSource).all()
                 for s in sources:
-                    await monitoring_service.check_source(s, db)
+                    await monitoring_service.check_source(s, db, user=user)
+                pr_monitor.sync_all(db)
             finally:
                 db.close()
         except Exception as e:

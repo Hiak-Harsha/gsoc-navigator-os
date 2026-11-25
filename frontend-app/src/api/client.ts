@@ -27,8 +27,19 @@ export const api = {
   getOverview: () => apiFetch<any>('/dashboard/overview'),
   getBriefing: () => apiFetch<any>('/dashboard/briefing'),
   getWeeklyReview: () => apiFetch<any>('/dashboard/weekly-review'),
+  getContextSnapshot: () => apiFetch<any>('/dashboard/context-snapshot'),
+  getAiSuggestions: () => apiFetch<any>('/dashboard/ai-suggestions'),
+  askAiCopilot: (question: string, history?: Array<{ role: string; content: string }>) =>
+    apiFetch<any>('/dashboard/ai-chat', {
+      method: 'POST',
+      body: JSON.stringify({ question, history: history || [] }),
+    }),
   getTasks: () => apiFetch<any[]>('/dashboard/tasks'),
-  updateTaskStatus: (id: number, status: string) => apiFetch<any>(`/dashboard/tasks/${id}/status?status=${status}`, { method: 'POST' }),
+  updateTaskStatus: (id: number, status: string) =>
+    apiFetch<any>(`/dashboard/tasks/${id}/status?status=${status}`, { method: 'POST' }),
+
+  // System & AI Status
+  getAiStatus: () => apiFetch<any>('/system/ai-status'),
 
   // User Profile & Living Skills
   getProfile: () => apiFetch<any>('/profile'),
@@ -43,7 +54,8 @@ export const api = {
   // Organizations
   getOrganizations: () => apiFetch<any[]>('/organizations'),
   toggleShortlist: (id: number) => apiFetch<any>(`/organizations/${id}/shortlist`, { method: 'POST' }),
-  compareOrganizations: (ids: number[]) => apiFetch<any[]>('/organizations/compare', { method: 'POST', body: JSON.stringify({ org_ids: ids }) }),
+  compareOrganizations: (ids: number[]) =>
+    apiFetch<any[]>('/organizations/compare', { method: 'POST', body: JSON.stringify({ org_ids: ids }) }),
 
   // Repositories
   getRepository: (id: number) => apiFetch<any>(`/repositories/${id}`),
@@ -57,27 +69,37 @@ export const api = {
   syncIssues: (repoId: number) => apiFetch<any>(`/issues/sync/${repoId}`, { method: 'POST' }),
 
   // Coaching Workflow (8 steps)
-  startCoaching: (issueId: number, mode: string = 'mentor') => apiFetch<any>('/coaching/start', { method: 'POST', body: JSON.stringify({ issue_id: issueId, mode }) }),
+  startCoaching: (issueId: number, mode: string = 'mentor') =>
+    apiFetch<any>('/coaching/start', { method: 'POST', body: JSON.stringify({ issue_id: issueId, mode }) }),
   getCoachingSession: (sessionId: number) => apiFetch<any>(`/coaching/${sessionId}`),
-  updateCoachingStep: (sessionId: number, data: any) => apiFetch<any>(`/coaching/${sessionId}/step`, { method: 'POST', body: JSON.stringify(data) }),
+  updateCoachingStep: (sessionId: number, data: any) =>
+    apiFetch<any>(`/coaching/${sessionId}/step`, { method: 'POST', body: JSON.stringify(data) }),
 
   // Contributions & PR Intelligence
   getContributions: () => apiFetch<any[]>('/contributions'),
   getPRLiveStatus: () => apiFetch<any[]>('/contributions/live-status'),
   syncPRLiveStatus: () => apiFetch<any>('/contributions/sync-live-status', { method: 'POST' }),
-  auditPR: (data: { pr_number: number; repository_id: number; diff_or_code: string }) => apiFetch<any>('/contributions/audit-pr', { method: 'POST', body: JSON.stringify(data) }),
-  logFeedback: (id: number, feedback: string, newStatus: string) => apiFetch<any>(`/contributions/${id}/feedback?feedback_text=${encodeURIComponent(feedback)}&new_status=${encodeURIComponent(newStatus)}`, { method: 'POST' }),
+  auditPR: (data: { pr_number: number; repository_id: number; diff_or_code: string }) =>
+    apiFetch<any>('/contributions/audit-pr', { method: 'POST', body: JSON.stringify(data) }),
+  logFeedback: (id: number, feedback: string, newStatus: string) =>
+    apiFetch<any>(
+      `/contributions/${id}/feedback?feedback_text=${encodeURIComponent(feedback)}&new_status=${encodeURIComponent(newStatus)}`,
+      { method: 'POST' }
+    ),
 
   // Proposals
   getProposals: () => apiFetch<any[]>('/proposals'),
   getProposal: (id: number) => apiFetch<any>(`/proposals/${id}`),
   createProposal: (data: any) => apiFetch<any>('/proposals', { method: 'POST', body: JSON.stringify(data) }),
-  updateProposal: (id: number, data: any) => apiFetch<any>(`/proposals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateProposal: (id: number, data: any) =>
+    apiFetch<any>(`/proposals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   auditProposal: (id: number) => apiFetch<any>(`/proposals/${id}/audit`, { method: 'POST' }),
 
   // Monitoring & Notifications
   getSources: () => apiFetch<any[]>('/monitoring/sources'),
   triggerCheck: () => apiFetch<any>('/monitoring/check', { method: 'POST' }),
-  getNotifications: (unreadOnly: boolean = false) => apiFetch<any[]>(`/monitoring/notifications?unread_only=${unreadOnly}`),
-  markNotificationRead: (id: number) => apiFetch<any>(`/monitoring/notifications/${id}/read`, { method: 'PUT' })
+  getNotifications: (unreadOnly: boolean = false) =>
+    apiFetch<any[]>(`/monitoring/notifications?unread_only=${unreadOnly}`),
+  markNotificationRead: (id: number) =>
+    apiFetch<any>(`/monitoring/notifications/${id}/read`, { method: 'PUT' })
 };
