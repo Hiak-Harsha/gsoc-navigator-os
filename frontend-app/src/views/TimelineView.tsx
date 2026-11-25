@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { CalendarDays, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
+import { Badge } from '../components/ui/Badge';
 
 export const TimelineView: React.FC = () => {
   const [timeline, setTimeline] = useState<any[]>([]);
@@ -23,40 +24,53 @@ export const TimelineView: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="p-8 text-slate-400 font-mono text-sm">Loading timeline schedule...</div>;
+    return (
+      <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+        Loading timeline schedule...
+      </div>
+    );
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title */}
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight">Timeline & Milestone Tracker</h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Timezone-aware GSoC 2027 program timeline. Dates are verified against official calendars and clearly flagged as planning estimates.
-        </p>
+    <div className="space-y-5 animate-fade-up">
+      <div className="flex items-start gap-3 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+          <CalendarDays className="h-5 w-5" />
+        </span>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight text-[var(--ink)]">Timeline &amp; Milestone Tracker</h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--ink-muted)]">
+            Timezone-aware GSoC 2027 program schedule verified against official calendars with clear planning estimates.
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {timeline.map((item, idx) => (
-          <div key={idx} className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-5 space-y-2">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 font-mono text-xs flex items-center justify-center font-bold">
+          <article
+            key={idx}
+            className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-2 transition-all hover:border-[var(--border-strong)]"
+          >
+            <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] font-mono text-[11px] font-bold text-[var(--accent-bright)]">
                   {idx + 1}
                 </span>
-                <h2 className="text-sm font-bold text-white">{item.stage}</h2>
-                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/80 border border-amber-800/40 px-2 py-0.5 rounded">
+                <h2 className="text-[14.5px] font-bold text-[var(--ink)]">{item.stage}</h2>
+                <Badge tone="amber" className="font-mono text-[10.5px]">
                   {item.status_note}
-                </span>
+                </Badge>
               </div>
-              <div className="text-xs font-mono text-slate-300">
+              <div className="font-mono text-[12px] font-semibold text-[var(--ink-secondary)]">
                 {new Date(item.start_date).toLocaleDateString()} — {new Date(item.end_date).toLocaleDateString()}
               </div>
             </div>
 
-            <p className="text-xs text-slate-300">{item.action_item}</p>
-            <div className="text-[10px] text-slate-500 font-mono">Source Provenance: {item.source}</div>
-          </div>
+            <p className="text-[13px] text-[var(--ink-secondary)]">{item.action_item}</p>
+            <div className="font-mono text-[10.5px] text-[var(--ink-muted)]">
+              Source Provenance: {item.source}
+            </div>
+          </article>
         ))}
       </div>
     </div>

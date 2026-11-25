@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { GraduationCap, ArrowRight, ArrowLeft, CheckCircle2, Terminal, Code2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, GraduationCap } from 'lucide-react';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 
-export const ContributionMentorView: React.FC<{ activeIssueId?: number }> = ({ activeIssueId }) => {
+export interface ContributionMentorViewProps {
+  activeIssueId?: number;
+  showToast?: (msg: string, error?: boolean) => void;
+}
+
+export const ContributionMentorView: React.FC<ContributionMentorViewProps> = ({
+  activeIssueId,
+  showToast,
+}) => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [stepNotes, setStepNotes] = useState('');
   const [patchDiff, setPatchDiff] = useState('');
@@ -30,6 +41,7 @@ export const ContributionMentorView: React.FC<{ activeIssueId?: number }> = ({ a
       }
     } catch (err) {
       console.error(err);
+      showToast?.('Failed to initialize coaching session', true);
     } finally {
       setLoading(false);
     }
@@ -38,44 +50,61 @@ export const ContributionMentorView: React.FC<{ activeIssueId?: number }> = ({ a
   const handleStepTransition = async (nextStep: number) => {
     if (!sessionData) return;
     try {
-      const updated = await api.updateCoachingStep(sessionData.session.id, {
+      await api.updateCoachingStep(sessionData.session.id, {
         step: nextStep,
         notes: stepNotes,
         patch_diff: patchDiff,
-        root_cause_confirmed: nextStep >= 5
+        root_cause_confirmed: nextStep >= 5,
       });
       const refreshed = await api.getCoachingSession(sessionData.session.id);
       setSessionData(refreshed);
+      showToast?.(`Saved & moved to Step ${nextStep}`);
     } catch (err) {
       console.error(err);
+      showToast?.('Could not update coaching step', true);
     }
   };
 
   if (loading || !sessionData) {
-    return <div className="p-8 text-slate-400 font-mono text-sm">Initializing coaching session...</div>;
+    return (
+      <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+        Initializing 8-Step Engineering Mentor...
+      </div>
+    );
   }
 
   const { session, issue, step_guidance } = sessionData;
   const steps = [
-    'Understand', 'Investigate', 'Learn', 'Debug', 'Implement', 'Test', 'Review', 'Submit Preparation'
+    'Understand',
+    'Investigate',
+    'Learn',
+    'Debug',
+    'Implement',
+    'Test',
+    'Review',
+    'Submit Prep',
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title */}
-      <div>
-        <div className="flex items-center gap-2">
-          <GraduationCap className="w-5 h-5 text-blue-400" />
-          <h1 className="text-xl font-bold text-white tracking-tight">Personal Contribution Coaching Agent</h1>
+    <div className="space-y-5 animate-fade-up">
+      {/* Header */}
+      <div className="flex items-start gap-3 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+          <GraduationCap className="h-5 w-5" />
+        </span>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight text-[var(--ink)]">
+            Personal Contribution Coaching Agent
+          </h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--ink-muted)]">
+            Issue #{issue.number}: <strong className="text-[var(--ink)]">{issue.title}</strong>
+          </p>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Issue #{issue.number}: {issue.title}
-        </p>
       </div>
 
-      {/* 8-Step Interactive Progress Tracker */}
-      <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      {/* 8-Step Interactive Progress Bar */}
+      <div className="rounded-2xl border bg-[var(--surface)] p-3.5 shadow-apple">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {steps.map((name, idx) => {
             const stepNum = idx + 1;
             const isCompleted = stepNum < session.current_step;
@@ -84,115 +113,118 @@ export const ContributionMentorView: React.FC<{ activeIssueId?: number }> = ({ a
             return (
               <button
                 key={stepNum}
+                type="button"
                 onClick={() => handleStepTransition(stepNum)}
-                className={`p-2.5 rounded-lg border text-left transition-all ${
-                  isCurrent ? 'bg-blue-600/20 border-blue-500 text-blue-200' :
-                  isCompleted ? 'bg-[#162238] border-emerald-500/30 text-emerald-300' :
-                  'bg-[#0f172a] border-slate-800 text-slate-500'
-                }`}
+                className={cn(
+                  'relative rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer',
+                  isCurrent
+                    ? 'border-[var(--accent-bright)] bg-[var(--accent-soft)] text-[var(--ink)] shadow-apple'
+                    : isCompleted
+                      ? 'border-[color:var(--emerald)]/35 bg-[var(--emerald-soft)] text-[var(--emerald)]'
+                      : 'bg-[var(--input-bg)] text-[var(--ink-muted)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]'
+                )}
               >
-                <div className="text-[10px] font-mono uppercase">Step {stepNum}</div>
-                <div className="text-xs font-semibold truncate">{name}</div>
+                <div className="font-mono text-[10px] uppercase">Step {stepNum}</div>
+                <div className="truncate text-[12px] font-semibold">{name}</div>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Main Coaching Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Step Guidance & Mentor Prompt */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
-              <h2 className="text-sm font-semibold text-white">
-                Step {step_guidance.step}: {step_guidance.name}
-              </h2>
-              <span className="text-[10px] font-mono bg-blue-950 text-blue-300 border border-blue-800/40 px-2 py-0.5 rounded">
-                Mode: {session.mode.toUpperCase()}
-              </span>
-            </div>
+      {/* Main Split */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <section className="lg:col-span-2 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-4">
+          <div className="flex items-center justify-between border-b pb-3">
+            <h2 className="text-[15px] font-semibold text-[var(--ink)]">
+              Step {step_guidance.step}: {step_guidance.name}
+            </h2>
+            <Badge tone="accent" className="font-mono">
+              MODE: {session.mode.toUpperCase()}
+            </Badge>
+          </div>
 
-            <div className="bg-[#162238] border border-[#253755] rounded-lg p-4 space-y-2">
-              <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold">Goal</span>
-              <p className="text-xs text-slate-200 font-medium">{step_guidance.goal}</p>
+          <div className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 space-y-1">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+              Step Goal
             </div>
+            <p className="text-[13px] font-medium text-[var(--ink)]">{step_guidance.goal}</p>
+          </div>
 
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Mentor Guidance</span>
-              <pre className="text-xs font-mono text-slate-300 bg-[#0b0f19] p-4 rounded-lg border border-[#1e293b] whitespace-pre-wrap leading-relaxed">
-                {step_guidance.guidance}
-              </pre>
+          <div className="space-y-1.5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+              Mentor Guidance
             </div>
+            <pre className="whitespace-pre-wrap rounded-xl border bg-[var(--input-bg)] p-4 font-mono text-[12px] leading-relaxed text-[var(--ink-secondary)]">
+              {step_guidance.guidance}
+            </pre>
+          </div>
 
-            {/* Step Action Notes */}
-            <div className="space-y-2 pt-2">
-              <label className="text-xs text-slate-300 font-medium block">
-                Your Investigation Notes / Hypotheses:
+          <div className="space-y-1.5">
+            <label className="block text-[12.5px] font-semibold text-[var(--ink)]">
+              Your Investigation Notes &amp; Hypotheses
+            </label>
+            <textarea
+              value={stepNotes}
+              onChange={(e) => setStepNotes(e.target.value)}
+              placeholder="Document your observations, test outputs, or code findings..."
+              className="h-24 w-full rounded-xl border bg-[var(--input-bg)] p-3 font-mono text-[12px] text-[var(--ink)] outline-none focus:border-[var(--accent-bright)]"
+            />
+          </div>
+
+          {session.current_step >= 5 && (
+            <div className="space-y-1.5">
+              <label className="block text-[12.5px] font-semibold text-[var(--ink)]">
+                Draft Code Patch / Diff
               </label>
               <textarea
-                value={stepNotes}
-                onChange={(e) => setStepNotes(e.target.value)}
-                placeholder="Document your observations, test results, or code findings..."
-                className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-lg p-3 text-xs text-slate-200 font-mono h-24 focus:outline-none focus:border-blue-500"
+                value={patchDiff}
+                onChange={(e) => setPatchDiff(e.target.value)}
+                placeholder="Paste your unified diff or updated implementation..."
+                className="h-32 w-full rounded-xl border bg-[var(--input-bg)] p-3 font-mono text-[12px] text-[var(--ink)] outline-none focus:border-[var(--accent-bright)]"
               />
             </div>
+          )}
 
-            {/* Diff input if in Implement or Review step */}
-            {session.current_step >= 5 && (
-              <div className="space-y-2">
-                <label className="text-xs text-slate-300 font-medium block">Draft Code Patch / Diff:</label>
-                <textarea
-                  value={patchDiff}
-                  onChange={(e) => setPatchDiff(e.target.value)}
-                  placeholder="Paste your diff or updated function here..."
-                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-lg p-3 text-xs text-slate-200 font-mono h-32 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            )}
+          <div className="flex items-center justify-between border-t pt-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleStepTransition(Math.max(1, session.current_step - 1))}
+              disabled={session.current_step === 1}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Previous Step</span>
+            </Button>
 
-            {/* Navigation buttons */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#1e293b]">
-              <button
-                onClick={() => handleStepTransition(Math.max(1, session.current_step - 1))}
-                disabled={session.current_step === 1}
-                className="px-3.5 py-1.5 bg-[#162238] border border-[#253755] text-xs text-slate-300 rounded hover:bg-[#1e293b] disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Previous Step
-              </button>
-
-              <button
-                onClick={() => handleStepTransition(Math.min(8, session.current_step + 1))}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors"
-              >
-                <span>{session.current_step === 8 ? 'Complete Session' : 'Save & Advance Step'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleStepTransition(Math.min(8, session.current_step + 1))}
+            >
+              <span>{session.current_step === 8 ? 'Complete Session' : 'Save & Advance Step'}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
           </div>
-        </div>
+        </section>
 
-        {/* Right Column: Issue Details & PR Draft */}
-        <div className="space-y-6">
-          <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-white">Target Problem</h3>
-            <p className="text-xs text-slate-300 leading-relaxed bg-[#162238] p-3 rounded border border-[#253755]">
+        <div className="space-y-5">
+          <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-3">
+            <h3 className="text-[14px] font-semibold text-[var(--ink)]">Target Problem</h3>
+            <p className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
               {issue.body}
             </p>
-          </div>
+          </section>
 
-          <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-white">Draft Commit & PR Metadata</h3>
-            <div className="space-y-2 text-xs font-mono">
-              <div>
-                <span className="text-[10px] text-slate-500 block">Commit Message:</span>
-                <code className="text-emerald-300 block bg-[#0b0f19] p-2 rounded border border-[#1e293b]">
-                  {session.pr_title_draft}
-                </code>
-              </div>
+          <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-3">
+            <h3 className="text-[14px] font-semibold text-[var(--ink)]">Draft Commit &amp; PR Metadata</h3>
+            <div className="space-y-1.5">
+              <span className="font-mono text-[10.5px] uppercase text-[var(--ink-muted)]">Commit Message</span>
+              <code className="block rounded-xl border bg-[var(--input-bg)] p-3 font-mono text-[12px] text-[var(--emerald)]">
+                {session.pr_title_draft}
+              </code>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

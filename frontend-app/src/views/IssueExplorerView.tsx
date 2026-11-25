@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Bug, ArrowRight, ExternalLink, Clock, Sparkles } from 'lucide-react';
+import { ArrowRight, Bug, Clock, ExternalLink } from 'lucide-react';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { cn, safeParseJson } from '../lib/utils';
 
-export const IssueExplorerView: React.FC<{ onStartCoaching: (issueId: number) => void }> = ({ onStartCoaching }) => {
+export const IssueExplorerView: React.FC<{ onStartCoaching: (issueId: number) => void }> = ({
+  onStartCoaching,
+}) => {
   const [issues, setIssues] = useState<any[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -25,125 +30,155 @@ export const IssueExplorerView: React.FC<{ onStartCoaching: (issueId: number) =>
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Intelligent Issue & Bug Discovery</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Mandatory dual-axis classification: Severity (S0–S4) and Difficulty (Level 1–5). Grouped into progressive learning tiers.
-          </p>
+    <div className="space-y-5 animate-fade-up">
+      {/* Header & Category Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--amber-soft)] text-[var(--amber)]">
+            <Bug className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-[var(--ink)]">
+              Intelligent Issue &amp; Bug Discovery
+            </h1>
+            <p className="mt-0.5 text-[12.5px] text-[var(--ink-muted)]">
+              Dual-axis classification by Severity (S0–S4) and Difficulty (L1–L5) grouped into progressive tiers.
+            </p>
+          </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1 bg-[#121a2d] border border-[#1e293b] p-1 rounded-lg">
-          {['all', 'start_now', 'stretch', 'advanced'].map((cat) => (
+        <div className="inline-flex flex-wrap rounded-xl border bg-[var(--input-bg)] p-1">
+          {[
+            { id: 'all', label: 'All Issues' },
+            { id: 'start_now', label: 'Start Now' },
+            { id: 'stretch', label: 'Stretch' },
+            { id: 'advanced', label: 'Advanced' },
+          ].map((cat) => (
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                categoryFilter === cat ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              key={cat.id}
+              type="button"
+              onClick={() => setCategoryFilter(cat.id)}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer',
+                categoryFilter === cat.id
+                  ? 'bg-[var(--surface)] text-[var(--ink)] shadow-apple'
+                  : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+              )}
             >
-              {cat === 'all' ? 'All Issues' : cat.replace('_', ' ').toUpperCase()}
+              {cat.label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Issues List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="p-8 text-slate-400 font-mono text-sm">Evaluating issues across repositories...</div>
-        ) : (
-          issues.map((iss) => {
-            const requiredSkills = JSON.parse(iss.required_skills || '[]');
-            const edgeCases = JSON.parse(iss.edge_cases || '[]');
+      {loading ? (
+        <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+          Evaluating issues across repositories...
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {issues.map((iss) => {
+            const requiredSkills = safeParseJson<string[]>(iss.required_skills, []);
+            const edgeCases = safeParseJson<string[]>(iss.edge_cases, []);
+            const severityTone: BadgeTone =
+              iss.severity === 'S0'
+                ? 'rose'
+                : iss.severity === 'S1' || iss.severity === 'S2'
+                  ? 'amber'
+                  : 'accent';
 
             return (
-              <div key={iss.id} className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-6 space-y-4 hover:border-[#2b3d5b] transition-all">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-slate-400">#{iss.number}</span>
-                      <h2 className="text-base font-bold text-white">{iss.title}</h2>
+              <article
+                key={iss.id}
+                className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple transition-all hover:border-[var(--border-strong)] space-y-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="neutral" className="font-mono">
+                        #{iss.number}
+                      </Badge>
+                      <h2 className="text-[15.5px] font-bold text-[var(--ink)]">{iss.title}</h2>
                     </div>
-                    <div className="flex items-center gap-2 pt-0.5">
-                      {/* Severity Pill */}
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                        iss.severity === 'S0' ? 'bg-rose-950/80 text-rose-300 border-rose-800/40' :
-                        iss.severity === 'S1' ? 'bg-orange-950/80 text-orange-300 border-orange-800/40' :
-                        iss.severity === 'S2' ? 'bg-amber-950/80 text-amber-300 border-amber-800/40' :
-                        'bg-blue-950/80 text-blue-300 border-blue-800/40'
-                      }`}>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={severityTone} className="font-mono">
                         Severity: {iss.severity}
-                      </span>
-                      {/* Difficulty Pill */}
-                      <span className="text-[10px] font-mono bg-purple-950/80 text-purple-300 border border-purple-800/40 px-2 py-0.5 rounded">
+                      </Badge>
+                      <Badge tone="violet" className="font-mono">
                         Difficulty: {iss.difficulty}
-                      </span>
-                      {/* Match Score */}
-                      <span className="text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 px-2 py-0.5 rounded">
+                      </Badge>
+                      <Badge tone="emerald" className="font-mono">
                         Match: {iss.match_score}%
-                      </span>
+                      </Badge>
+                      <Badge tone="neutral" className="font-mono">
+                        <Clock className="h-3 w-3" /> {iss.estimated_effort_hours}h
+                      </Badge>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 items-center gap-2">
                     <a
                       href={iss.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 bg-[#162238] border border-[#253755] text-slate-400 hover:text-white rounded"
+                      className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border bg-[var(--surface-elevated)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]"
+                      title="Open on GitHub"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="h-4 w-4" />
                     </a>
-                    <button
-                      onClick={() => onStartCoaching(iss.id)}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors"
-                    >
+                    <Button variant="primary" size="sm" onClick={() => onStartCoaching(iss.id)}>
                       <span>Start Coaching</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
 
                 {iss.body && (
-                  <p className="text-xs text-slate-300 leading-relaxed bg-[#162238]/60 p-3 rounded border border-[#253755]/50">
+                  <p className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
                     {iss.body}
                   </p>
                 )}
 
-                {/* Technical Guidance & Strategy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold">Investigation Strategy</span>
-                    <pre className="text-xs font-mono text-slate-300 bg-[#0f172a] p-2.5 rounded border border-[#1e293b] whitespace-pre-wrap">
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+                      Investigation Strategy
+                    </div>
+                    <pre className="whitespace-pre-wrap rounded-xl border bg-[var(--input-bg)] p-3 font-mono text-[12px] text-[var(--ink-secondary)]">
                       {iss.investigation_strategy}
                     </pre>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <div>
-                      <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold block mb-1">Testing & Edge Cases</span>
-                      <ul className="space-y-1 text-slate-300">
-                        {edgeCases.map((ec: string, idx: number) => (
-                          <li key={idx} className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--amber)]">
+                        Testing &amp; Edge Cases
+                      </div>
+                      <ul className="space-y-1 text-[12px] text-[var(--ink-secondary)]">
+                        {edgeCases.map((ec, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--amber)]" />
                             <span>{ec}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                    <div className="text-[11px] text-slate-400 font-mono">
-                      Estimated effort: {iss.estimated_effort_hours} hours • Required: {requiredSkills.join(', ')}
-                    </div>
+                    {requiredSkills.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {requiredSkills.map((sk, idx) => (
+                          <Badge key={idx} tone="neutral" className="font-mono text-[10.5px]">
+                            {sk}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              </article>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 };

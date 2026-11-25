@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Building2, Bookmark, BookmarkCheck, ExternalLink, Check, Code2, Users } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Building2, Check, ExternalLink } from 'lucide-react';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Sheet } from '../components/ui/Sheet';
+import { cn, safeParseJson } from '../lib/utils';
 
-export const OrganizationsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
+export interface OrganizationsViewProps {
+  onNavigate: (view: string) => void;
+  showToast?: (msg: string, error?: boolean) => void;
+}
+
+export const OrganizationsView: React.FC<OrganizationsViewProps> = ({ onNavigate, showToast }) => {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedOrgs, setSelectedOrgs] = useState<number[]>([]);
   const [comparison, setComparison] = useState<any[] | null>(null);
@@ -19,6 +28,7 @@ export const OrganizationsView: React.FC<{ onNavigate: (view: string) => void }>
       setOrganizations(data);
     } catch (err) {
       console.error(err);
+      showToast?.('Failed to load organizations', true);
     } finally {
       setLoading(false);
     }
@@ -27,17 +37,24 @@ export const OrganizationsView: React.FC<{ onNavigate: (view: string) => void }>
   const handleToggleShortlist = async (orgId: number) => {
     try {
       const res = await api.toggleShortlist(orgId);
-      setOrganizations(organizations.map(o => o.id === orgId ? { ...o, is_shortlisted: res.is_shortlisted } : o));
+      setOrganizations((prev) =>
+        prev.map((o) => (o.id === orgId ? { ...o, is_shortlisted: res.is_shortlisted } : o))
+      );
+      showToast?.(res.is_shortlisted ? 'Organization shortlisted' : 'Removed from shortlist');
     } catch (err) {
       console.error(err);
+      showToast?.('Failed to toggle shortlist', true);
     }
   };
 
   const handleToggleCompare = (orgId: number) => {
     if (selectedOrgs.includes(orgId)) {
-      setSelectedOrgs(selectedOrgs.filter(id => id !== orgId));
+      setSelectedOrgs(selectedOrgs.filter((id) => id !== orgId));
     } else {
-      if (selectedOrgs.length >= 3) return;
+      if (selectedOrgs.length >= 3) {
+        showToast?.('You can compare up to 3 organizations at once', true);
+        return;
+      }
       setSelectedOrgs([...selectedOrgs, orgId]);
     }
   };
@@ -49,195 +66,212 @@ export const OrganizationsView: React.FC<{ onNavigate: (view: string) => void }>
       setComparison(data);
     } catch (err) {
       console.error(err);
+      showToast?.('Comparison failed', true);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-slate-400 font-mono text-sm">Discovering mentoring organizations...</div>;
+    return (
+      <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+        Discovering GSoC mentoring organizations...
+      </div>
+    );
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Organization Discovery & Fit Engine</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Algorithmic fit scoring based on your skills (Python, C, DSA, OS), community openness, and GSoC track record.
-          </p>
+    <div className="space-y-5 animate-fade-up">
+      {/* Header Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+            <Building2 className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-[var(--ink)]">
+              Organization Discovery &amp; Fit Engine
+            </h1>
+            <p className="mt-0.5 text-[12.5px] text-[var(--ink-muted)]">
+              Compatibility scoring across your stack, community responsiveness, and past GSoC slot consistency.
+            </p>
+          </div>
         </div>
         {selectedOrgs.length >= 2 && (
-          <button
-            onClick={handleRunComparison}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium shadow-sm transition-colors"
-          >
+          <Button variant="primary" onClick={handleRunComparison}>
             Compare Selected ({selectedOrgs.length})
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Comparison Drawer if active */}
-      {comparison && (
-        <div className="bg-[#121a2d] border border-blue-500/40 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Side-by-Side Comparison</h3>
-            <button onClick={() => setComparison(null)} className="text-xs text-slate-400 hover:text-white">Close</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {comparison.map((c) => (
-              <div key={c.id} className="bg-[#162238] border border-[#253755] rounded-lg p-4 space-y-2 text-xs">
-                <div className="font-bold text-white text-sm">{c.name}</div>
-                <div className="text-blue-400 font-mono">Fit Score: {c.fit_score}%</div>
-                <div className="text-slate-300">Languages: {c.languages.join(', ')}</div>
-                <div className="text-slate-400">Skill Gaps: {c.skill_gaps.join(', ') || 'None'}</div>
-                <div className="text-[11px] text-slate-500">Channel: {c.community_channel}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {organizations.map((org) => {
-          const languages = JSON.parse(org.primary_languages || '[]');
-          const topics = JSON.parse(org.topics || '[]');
-          const fitReasons = JSON.parse(org.fit_reasons || '[]');
+          const languages = safeParseJson<string[]>(org.primary_languages, []);
+          const topics = safeParseJson<string[]>(org.topics, []);
+          const fitReasons = safeParseJson<string[]>(org.fit_reasons, []);
+          const yearsCount = safeParseJson<any[]>(org.past_participation_years, []).length;
           const isSelected = selectedOrgs.includes(org.id);
 
           return (
-            <div
+            <article
               key={org.id}
-              className={`bg-[#121a2d] border rounded-xl p-6 space-y-4 transition-all ${
-                org.is_shortlisted ? 'border-blue-500/50 shadow-md' : 'border-[#1e293b]'
-              }`}
+              className={cn(
+                'flex flex-col justify-between rounded-2xl border bg-[var(--surface)] p-5 shadow-apple transition-all hover:border-[var(--border-strong)] space-y-4',
+                org.is_shortlisted && 'border-[color:var(--accent-bright)]/50'
+              )}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base font-bold text-white">{org.name}</h2>
-                    <span className="text-[10px] font-mono bg-blue-950/80 text-blue-300 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                      Probability Fit: {org.fit_score}%
-                    </span>
-                    <span className="text-[10px] font-mono bg-amber-950/60 text-amber-300 border border-amber-800/40 px-2 py-0.5 rounded">
-                      2027 Status: Pending Official Google Announcement (Feb 2027)
+              <div className="space-y-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-[16px] font-bold text-[var(--ink)]">{org.name}</h2>
+                      <Badge tone="accent" className="font-mono">
+                        Fit {org.fit_score}%
+                      </Badge>
+                      <Badge tone="amber" className="text-[10.5px]">
+                        2027 Pending Feb
+                      </Badge>
+                    </div>
+                    <div className="font-mono text-[11px] text-[var(--ink-muted)]">
+                      {yearsCount} past GSoC editions
+                    </div>
+                    <a
+                      href={org.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[12px] text-[var(--accent-bright)] hover:underline"
+                    >
+                      <span className="truncate">{org.website}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Button
+                      variant={isSelected ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => handleToggleCompare(org.id)}
+                    >
+                      {isSelected ? 'Comparing' : 'Compare'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => handleToggleShortlist(org.id)}
+                      title={org.is_shortlisted ? 'Shortlisted' : 'Add to Shortlist'}
+                      className={cn(
+                        'min-h-[34px] min-w-[34px]',
+                        org.is_shortlisted && 'text-[var(--amber)] border-[color:var(--amber)]/40 bg-[var(--amber-soft)]'
+                      )}
+                    >
+                      {org.is_shortlisted ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">{org.description}</p>
+
+                {/* Strategic Targets */}
+                <div className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone="amber">{org.portfolio_role || 'Primary Target'}</Badge>
+                      <Badge tone="emerald">{org.annual_slots || '10-18 slots/yr'}</Badge>
+                      <Badge tone="neutral">{org.competition_level || 'Medium'}</Badge>
+                    </div>
+                    <span className="font-mono text-[11px] font-semibold text-[var(--accent-bright)]">
+                      Target: {org.target_contributions_required || 3} Merged PRs
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    Consistent GSoC track record across {JSON.parse(org.past_participation_years || '[]').length} past editions
+                  <div className="rounded-lg border bg-[var(--surface)] px-3 py-2 text-[11.5px] text-[var(--ink-secondary)]">
+                    <strong className="text-[var(--ink)]">Selection Strategy: </strong>
+                    {org.contribution_breakdown || '1 Starter Bug Fix (L1/L2) + 1 Subsystem PR (L3) + Proposal Draft'}
                   </div>
-                  <a
-                    href={org.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-slate-400 hover:text-blue-400 flex items-center gap-1 mt-0.5"
-                  >
-                    <span>{org.website}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggleCompare(org.id)}
-                    className={`text-xs px-2.5 py-1 rounded border transition-colors ${
-                      isSelected ? 'bg-blue-600 text-white border-blue-500' : 'bg-[#162238] text-slate-400 border-[#253755]'
-                    }`}
-                  >
-                    {isSelected ? 'Comparing' : 'Compare'}
-                  </button>
-                  <button
-                    onClick={() => handleToggleShortlist(org.id)}
-                    className={`p-1.5 rounded transition-colors ${
-                      org.is_shortlisted ? 'text-amber-400 bg-amber-950/60' : 'text-slate-500 hover:text-slate-300'
-                    }`}
-                    title={org.is_shortlisted ? 'Shortlisted' : 'Add to Shortlist'}
-                  >
-                    {org.is_shortlisted ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Description */}
-              <p className="text-xs text-slate-300 leading-relaxed">{org.description}</p>
-
-              {/* Strategic GSoC Selection Targets & Probability */}
-              <div className="bg-[#10192b] border border-blue-900/50 rounded-lg p-3.5 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono uppercase font-bold text-amber-400 bg-amber-950/70 border border-amber-800/40 px-2 py-0.5 rounded">
-                      Role: {org.portfolio_role || 'Primary Target'}
-                    </span>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
-                      Slots: {org.annual_slots || '10-18 slots/yr'}
-                    </span>
-                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded">
-                      Competition: {org.competition_level || 'Medium'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-blue-300 font-semibold">
-                    🎯 Target: {org.target_contributions_required || 3} Merged PRs
-                  </span>
-                </div>
-
-                <div className="text-[11px] text-slate-300 bg-[#162238] p-2 rounded border border-[#253755]">
-                  <strong className="text-blue-300 font-medium">How to Win Selection: </strong>
-                  <span>{org.contribution_breakdown || '1 Starter Bug Fix (L1/L2) + 1 Subsystem Logic PR (L3) + 1 Proposal Draft'}</span>
-                </div>
-              </div>
-
-              {/* Languages & Topics */}
-              <div className="space-y-2">
+                {/* Stack Pills */}
                 <div className="flex flex-wrap gap-1.5">
-                  {languages.map((lang: string, idx: number) => (
-                    <span key={idx} className="text-[11px] font-mono bg-[#162238] border border-[#253755] text-slate-300 px-2 py-0.5 rounded">
+                  {languages.map((lang, idx) => (
+                    <Badge key={`l-${idx}`} tone="accent" className="font-mono">
                       {lang}
-                    </span>
+                    </Badge>
                   ))}
-                  {topics.map((top: string, idx: number) => (
-                    <span key={idx} className="text-[11px] font-mono bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded">
+                  {topics.map((top, idx) => (
+                    <Badge key={`t-${idx}`} tone="neutral" className="font-mono">
                       {top}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
+
+                {/* Fit Rationale */}
+                {fitReasons.length > 0 && (
+                  <div className="rounded-xl border bg-[var(--input-bg)] p-3 space-y-1.5">
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                      Fit Rationale
+                    </div>
+                    <ul className="space-y-1">
+                      {fitReasons.map((reason, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5 text-[12px] text-[var(--ink-secondary)]">
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--emerald)]" />
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
-              {/* Fit Rationale */}
-              <div className="bg-[#162238] border border-[#253755] rounded-lg p-3 space-y-1.5">
-                <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold">Fit Rationale</span>
-                <ul className="space-y-1">
-                  {fitReasons.map((reason: string, idx: number) => (
-                    <li key={idx} className="flex items-start gap-1.5 text-xs text-slate-300">
-                      <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>{reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-2 border-t border-[#1e293b]">
+              <div className="flex items-center justify-between border-t pt-3">
                 <a
                   href={org.contribution_guide_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-bright)] hover:underline"
                 >
                   <span>Contributing Guidelines</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="h-3 w-3" />
                 </a>
-                <button
-                  onClick={() => onNavigate('repositories')}
-                  className="px-3 py-1.5 bg-[#162238] hover:bg-[#1e293b] border border-[#253755] text-white rounded text-xs transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={() => onNavigate('repositories')}>
                   Explore Codebase
-                </button>
+                </Button>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
+
+      {/* Side-by-Side Comparison Sheet */}
+      <Sheet
+        open={Boolean(comparison)}
+        onClose={() => setComparison(null)}
+        eyebrow="Organization Fit Engine"
+        title="Side-by-Side Comparison"
+        widthClass="max-w-[720px]"
+      >
+        {comparison && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {comparison.map((c) => (
+              <div key={c.id} className="rounded-xl border bg-[var(--surface-elevated)] p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[15px] font-bold text-[var(--ink)]">{c.name}</h3>
+                  <Badge tone="accent" className="font-mono">
+                    {c.fit_score}% Fit
+                  </Badge>
+                </div>
+                <div className="text-[12px] text-[var(--ink-secondary)]">
+                  <strong className="text-[var(--ink)]">Languages:</strong> {c.languages?.join(', ')}
+                </div>
+                <div className="text-[12px] text-[var(--ink-secondary)]">
+                  <strong className="text-[var(--ink)]">Skill Gaps:</strong>{' '}
+                  {c.skill_gaps?.length ? c.skill_gaps.join(', ') : 'None identified'}
+                </div>
+                <div className="font-mono text-[11px] text-[var(--ink-muted)]">
+                  Channel: {c.community_channel || 'Official Mailing List / Discourse'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 };

@@ -1,32 +1,179 @@
 @import "tailwindcss";
 
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/*
+ * Apple × Microsoft Fluent Hybrid Design System (aligned with Workspace Navigator)
+ * - Apple: Clean Light Gray canvas (#F5F5F7) / Space Gray dark (#111113), frosted vibrancy, precision radii, generous breathing room
+ * - Microsoft Fluent 2: Mica-layered cards, 3px active left indicator, Trust Blue / Vibrant Green / Warm Amber / Crimson Red semantic system
+ */
+:root,
+html.light {
+  --canvas: #f5f5f7;
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.82);
+  --surface-elevated: #f8f9fb;
+  --surface-hover: #f0f2f6;
+  --input-bg: #f1f2f6;
+  --border-hairline: #e4e6ec;
+  --border-strong: #cfd4df;
+  --specular: rgba(255, 255, 255, 0.8);
+
+  --ink: #1d1d1f;
+  --ink-secondary: #3a3a3f;
+  --ink-muted: #6e6e73;
+
+  --accent: #0067b8;
+  --accent-bright: #0078d4;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(0, 103, 184, 0.1);
+
+  --emerald: #107c10;
+  --emerald-soft: rgba(16, 124, 16, 0.11);
+
+  --amber: #c27803;
+  --amber-soft: rgba(255, 185, 0, 0.18);
+
+  --violet: #5e5ce6;
+  --violet-soft: rgba(94, 92, 230, 0.11);
+
+  --rose: #d13438;
+  --rose-soft: rgba(209, 52, 56, 0.1);
+
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.03);
+  --spotlight: rgba(0, 103, 184, 0.06);
+  color-scheme: light;
+}
+
+html.dark {
+  --canvas: #111113;
+  --surface: #1c1c1e;
+  --surface-glass: rgba(28, 28, 30, 0.82);
+  --surface-elevated: #242427;
+  --surface-hover: #2c2c30;
+  --input-bg: #161618;
+  --border-hairline: #2c2c30;
+  --border-strong: #3e3e44;
+  --specular: rgba(255, 255, 255, 0.05);
+
+  --ink: #f5f5f7;
+  --ink-secondary: #d1d1d6;
+  --ink-muted: #8e8e93;
+
+  --accent: #0a84ff;
+  --accent-bright: #409cff;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(10, 132, 255, 0.16);
+
+  --emerald: #30d158;
+  --emerald-soft: rgba(48, 209, 88, 0.15);
+
+  --amber: #ffd60a;
+  --amber-soft: rgba(255, 214, 10, 0.15);
+
+  --violet: #bf5af2;
+  --violet-soft: rgba(191, 90, 242, 0.16);
+
+  --rose: #ff453a;
+  --rose-soft: rgba(255, 69, 58, 0.16);
+
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --spotlight: rgba(10, 132, 255, 0.12);
   color-scheme: dark;
 }
 
-body {
-  margin: 0;
-  background-color: #0b0f19;
-  color: #f1f5f9;
-  min-height: 100vh;
+@layer base {
+  * {
+    border-color: var(--border-hairline);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--canvas);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  code,
+  pre,
+  kbd,
+  .font-mono {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+  }
 }
 
-/* Custom Scrollbar for Code and Tree navigation */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.shadow-apple {
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--specular);
 }
 
-::-webkit-scrollbar-track {
-  background: #0f172a;
+/* Sleek Apple-style thin scrollbars */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+  }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+@keyframes fade-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 2.8s ease-in-out infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 34s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer-sweep,
+  .animate-fade-up,
+  .animate-marquee {
+    animation: none !important;
+  }
 }

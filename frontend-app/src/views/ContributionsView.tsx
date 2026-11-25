@@ -1,34 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/client';
-import { 
-  GitPullRequest, 
-  GitMerge, 
-  MessageSquare, 
-  CheckCircle2, 
-  ExternalLink,
+import {
   BookOpen,
-  ChevronDown,
-  ChevronUp,
-  Terminal,
-  Cpu,
-  Lightbulb,
-  ShieldCheck,
-  RefreshCw,
-  AlertTriangle,
-  Clock,
-  Sparkles,
   CheckCircle,
-  FileText
+  CheckCircle2,
+  Clock,
+  Cpu,
+  ExternalLink,
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  LayoutGrid,
+  Lightbulb,
+  List,
+  MessageSquare,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Terminal,
 } from 'lucide-react';
+import { BentoCard } from '../components/magic/BentoCard';
+import { NumberTicker } from '../components/magic/NumberTicker';
+import { ShimmerButton } from '../components/magic/ShimmerButton';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Sheet } from '../components/ui/Sheet';
+import { cn, safeParseJson } from '../lib/utils';
 
-export const ContributionsView: React.FC = () => {
+export interface ContributionsViewProps {
+  showToast?: (msg: string, error?: boolean) => void;
+}
+
+export const ContributionsView: React.FC<ContributionsViewProps> = ({ showToast }) => {
   const [contributions, setContributions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedMasterclass, setExpandedMasterclass] = useState<Record<number, boolean>>({});
-  const [activeTab, setActiveTab] = useState<Record<number, string>>({});
   const [liveReports, setLiveReports] = useState<Record<number, any>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('gn_pr_view_mode');
+    return saved === 'list' ? 'list' : 'grid';
+  });
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'merged'>('all');
+  const [selectedPR, setSelectedPR] = useState<any | null>(null);
+  const [masterclassTab, setMasterclassTab] = useState<'blueprint' | 'rootcause' | 'testing' | 'interview'>('blueprint');
+
+  useEffect(() => {
+    localStorage.setItem('gn_pr_view_mode', viewMode);
+  }, [viewMode]);
 
   const syncLiveStatus = async () => {
     try {
@@ -45,7 +64,8 @@ export const ContributionsView: React.FC = () => {
       const data = await api.getContributions();
       setContributions(data);
     } catch (err) {
-      console.error("Failed to sync live PR status:", err);
+      console.error('Failed to sync live PR status:', err);
+      showToast?.('Could not sync GitHub live PR status', true);
     } finally {
       setSyncing(false);
     }
@@ -56,9 +76,6 @@ export const ContributionsView: React.FC = () => {
       setLoading(true);
       const data = await api.getContributions();
       setContributions(data);
-      if (data.length > 0) {
-        setExpandedMasterclass({ [data[0].id]: true });
-      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -73,418 +90,557 @@ export const ContributionsView: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const toggleMasterclass = (id: number) => {
-    setExpandedMasterclass(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  const filteredContributions = useMemo(() => {
+    return contributions.filter((c) => {
+      const live = liveReports[c.pr_number] || {};
+      const isMerged = c.status === 'merged' || live.is_merged;
+      if (statusFilter === 'merged') return isMerged;
+      if (statusFilter === 'open') return !isMerged;
+      return true;
+    });
+  }, [contributions, liveReports, statusFilter]);
 
-  const setTab = (id: number, tab: string) => {
-    setActiveTab(prev => ({ ...prev, [id]: tab }));
-  };
+  const mergedCount = contributions.filter((c) => c.status === 'merged' || liveReports[c.pr_number]?.is_merged).length;
+  const hasMergedPR = mergedCount > 0;
+  const passingPRs = contributions.filter((c) => {
+    const live = liveReports[c.pr_number];
+    return live && live.ci_total > 0 && live.ci_passed === live.ci_total;
+  }).length;
 
-  const hasMergedPR = contributions.some(c => c.status === 'merged');
+  const openMasterclassSheet = (contrib: any) => {
+    setMasterclassTab('blueprint');
+    setSelectedPR(contrib);
+  };
 
   if (loading && contributions.length === 0) {
-    return <div className="p-8 text-slate-400 font-mono text-sm">Loading contribution intelligence...</div>;
+    return (
+      <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+        Loading Live PR Sentinel &amp; Masterclass Intelligence...
+      </div>
+    );
   }
 
+  const selectedLive = selectedPR ? liveReports[selectedPR.pr_number] || {} : {};
+  const selectedFiles = selectedPR ? safeParseJson<string[]>(selectedPR.files_changed, []) : [];
+  const selectedSkills = selectedPR ? safeParseJson<string[]>(selectedPR.demonstrated_skills, []) : [];
+  const selectedMasterclass = selectedPR ? safeParseJson<any>(selectedPR.learning_breakdown, null) : null;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title & Live Sentinel Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <BookOpen className="w-6 h-6 text-blue-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Engineering Masterclass & Live PR Sentinel</h1>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time PR health monitor, continuous CI tracking, strict protocol compliance, and self-reliance engineering masterclasses.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {lastSynced && (
-            <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 bg-[#121a2d] border border-slate-800 px-2.5 py-1 rounded">
-              <Clock className="w-3 h-3 text-slate-500" />
-              Synced: <span className="text-slate-300">{lastSynced}</span>
-            </span>
-          )}
-          <button
-            onClick={syncLiveStatus}
-            disabled={syncing}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-semibold font-mono transition-all disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-blue-400' : ''}`} />
-            <span>{syncing ? 'Syncing GitHub...' : 'Sync Live Status'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Merged Celebratory Alert if any PR is merged */}
+    <div className="space-y-5 animate-fade-up">
+      {/* Merged Celebratory Alert */}
       {hasMergedPR && (
-        <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/70 to-blue-950/80 border border-purple-500/40 rounded-xl p-4 flex items-center gap-3 text-purple-200 shadow-xl">
-          <Sparkles className="w-6 h-6 text-amber-300 shrink-0 animate-pulse" />
-          <div className="text-xs">
-            <span className="font-bold text-sm text-white">🎉 CONTRIBUTION MERGED!</span> Your code has officially landed into upstream open-source. Outstanding milestone for your GSoC selection portfolio!
+        <div className="flex items-center gap-3 rounded-xl border border-[color:var(--violet)]/40 bg-[var(--violet-soft)] p-4 text-[var(--ink)] shadow-apple">
+          <Sparkles className="h-5 w-5 shrink-0 text-[var(--violet)] animate-pulse" />
+          <div className="text-[12.5px]">
+            <strong className="font-semibold text-[var(--violet)]">Contribution Merged!</strong> Your code has officially landed upstream—a decisive proof point for your GSoC portfolio.
           </div>
         </div>
       )}
 
-      {/* Live Sentinel Monitoring Panel */}
-      <div className="bg-[#101726] border border-slate-800 rounded-xl p-5 space-y-4 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">Live PR Sentinel & CI Health Watcher</span>
-            <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded font-mono">
-              Auto-Polling Active
+      {/* Bento Live Sentinel Header */}
+      <section className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-12">
+        <BentoCard className="md:col-span-2 xl:col-span-6 flex flex-col justify-between">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full opacity-20 blur-3xl"
+            style={{ background: 'linear-gradient(135deg, #0067B8 0%, #107C10 60%, #5E5CE6 100%)' }}
+          />
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+                <span className="h-2 w-2 rounded-full bg-[var(--emerald)] animate-ping" />
+                <span>Live PR Sentinel &amp; CI Watcher</span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2.5">
+                <span className="text-3xl font-bold tracking-tight text-[var(--ink)]">
+                  <NumberTicker value={contributions.length} />
+                </span>
+                <span className="text-[12.5px] text-[var(--ink-muted)]">
+                  tracked upstream pull requests (60s auto-polling)
+                </span>
+              </div>
+            </div>
+
+            <ShimmerButton
+              onClick={() => {
+                syncLiveStatus();
+                showToast?.('Synchronizing GitHub PR CI telemetry...');
+              }}
+              disabled={syncing}
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', syncing && 'animate-spin')} />
+              <span>{syncing ? 'Syncing...' : 'Sync GitHub'}</span>
+            </ShimmerButton>
+          </div>
+
+          {/* Protocol Compliance Gates */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border bg-[var(--input-bg)] px-3 py-2 text-[11px]">
+            <span className="flex items-center gap-1 font-semibold text-[var(--ink-secondary)]">
+              <ShieldCheck className="h-3.5 w-3.5 text-[var(--accent-bright)]" /> Protocol Gates:
+            </span>
+            <Badge tone="emerald">
+              <CheckCircle className="h-3 w-3" /> AI Disclosure
+            </Badge>
+            <Badge tone="emerald">
+              <CheckCircle className="h-3 w-3" /> .mailmap Verified
+            </Badge>
+            <Badge tone="emerald">
+              <CheckCircle className="h-3 w-3" /> Unit &amp; Doctests
+            </Badge>
+            <Badge tone="emerald">
+              <CheckCircle className="h-3 w-3" /> Changelog Added
+            </Badge>
+          </div>
+        </BentoCard>
+
+        <BentoCard className="xl:col-span-3 flex flex-col justify-between" onClick={() => setStatusFilter('open')}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+              CI Verified Healthy
+            </span>
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--emerald-soft)] text-[var(--emerald)]">
+              <CheckCircle2 className="h-4 w-4" />
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-            <span>Portfolio Health:</span>
-            <span className="text-emerald-400 font-bold">{contributions.length} Active Contributions</span>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-bold tracking-tight text-[var(--ink)]">
+              <NumberTicker value={passingPRs} />
+            </span>
+            <Badge tone="emerald">Green Checks</Badge>
+          </div>
+          <div className="mt-3 text-[11px] text-[var(--ink-muted)]">
+            {lastSynced ? `Last checked at ${lastSynced}` : 'Live GitHub REST API telemetry'}
+          </div>
+        </BentoCard>
+
+        <BentoCard className="xl:col-span-3 flex flex-col justify-between" onClick={() => setStatusFilter('merged')}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+              Landed Upstream
+            </span>
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--violet-soft)] text-[var(--violet)]">
+              <GitMerge className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-bold tracking-tight text-[var(--ink)]">
+              <NumberTicker value={mergedCount} />
+            </span>
+            <Badge tone={mergedCount > 0 ? 'violet' : 'neutral'}>
+              {mergedCount > 0 ? 'Merged' : 'In Review'}
+            </Badge>
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
+            <Clock className="h-3 w-3" />
+            <span>Open any card below for its Masterclass</span>
+          </div>
+        </BentoCard>
+      </section>
+
+      {/* Workspace Navigator Controls Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[13px] font-medium text-[var(--ink-muted)]">
+          Showing <span className="font-semibold text-[var(--ink)]">{filteredContributions.length}</span> of{' '}
+          {contributions.length} pull requests
+          {statusFilter !== 'all' && ` · ${statusFilter}`}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Status segmented pills */}
+          <div className="inline-flex rounded-lg border bg-[var(--surface)] p-1 shadow-apple">
+            {(['all', 'open', 'merged'] as const).map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={cn(
+                  'rounded-md px-3 py-1 text-[12px] font-medium capitalize transition-colors cursor-pointer',
+                  statusFilter === st
+                    ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                    : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                )}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* Grid / List View Switcher (exact match to Workspace Navigator) */}
+          <div className="inline-flex rounded-lg border bg-[var(--surface)] p-1 shadow-apple">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              title="Grid view"
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-md cursor-pointer',
+                viewMode === 'grid'
+                  ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                  : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              title="List view"
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-md cursor-pointer',
+                viewMode === 'list'
+                  ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                  : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
           </div>
         </div>
-
-        {/* Protocol & Compliance Bar */}
-        <div className="bg-[#0c121e] border border-slate-800/80 rounded-lg p-3 text-[11px] flex flex-wrap items-center gap-y-2 gap-x-4 text-slate-300">
-          <span className="text-slate-400 font-mono font-semibold flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> Protocol Gates:
-          </span>
-          <span className="flex items-center gap-1 text-emerald-300 font-mono">
-            <CheckCircle className="w-3 h-3 text-emerald-400" /> AI Policy Disclosure
-          </span>
-          <span className="flex items-center gap-1 text-emerald-300 font-mono">
-            <CheckCircle className="w-3 h-3 text-emerald-400" /> .mailmap Verified
-          </span>
-          <span className="flex items-center gap-1 text-emerald-300 font-mono">
-            <CheckCircle className="w-3 h-3 text-emerald-400" /> Unit & Doctests Green
-          </span>
-          <span className="flex items-center gap-1 text-emerald-300 font-mono">
-            <CheckCircle className="w-3 h-3 text-emerald-400" /> Towncrier Changelog Added
-          </span>
-        </div>
-
-        {/* Live PR Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {contributions.map((c) => {
-            const live = liveReports[c.pr_number] || {};
-            const isMerged = c.status === 'merged' || live.is_merged;
-            const hasFailures = (live.ci_failed || 0) > 0;
-            const inProgress = (live.ci_in_progress || 0) > 0;
-            const allPassed = live.ci_total > 0 && live.ci_passed === live.ci_total;
-
-            return (
-              <div key={c.id} className="bg-[#141d30] border border-slate-800 rounded-lg p-3 space-y-2.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="text-[10px] font-mono font-bold text-blue-400 bg-blue-950/60 border border-blue-800/40 px-1.5 py-0.5 rounded">
-                      PR #{c.pr_number}
-                    </span>
-                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold ${
-                      isMerged ? 'bg-purple-950/80 text-purple-300 border border-purple-800/40' :
-                      allPassed ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40' :
-                      hasFailures ? 'bg-amber-950/80 text-amber-300 border border-amber-800/40' :
-                      'bg-blue-950/80 text-blue-300 border border-blue-800/40'
-                    }`}>
-                      {isMerged ? 'Merged 🎉' : c.status}
-                    </span>
-                  </div>
-                  <h3 className="text-xs font-semibold text-slate-100 line-clamp-2 leading-snug">
-                    {c.pr_title}
-                  </h3>
-                </div>
-
-                <div className="space-y-1.5 text-[11px] font-mono pt-2 border-t border-slate-800/60">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>CI Status:</span>
-                    <span className={`font-bold ${
-                      allPassed ? 'text-emerald-400' :
-                      hasFailures ? 'text-amber-400' :
-                      inProgress ? 'text-blue-400' : 'text-slate-300'
-                    }`}>
-                      {live.ci_total !== undefined ? `${live.ci_passed}/${live.ci_total} passing` : 'Monitoring'}
-                    </span>
-                  </div>
-
-                  {live.alerts && live.alerts.length > 0 && (
-                    <div className="text-[10px] text-slate-300 bg-slate-900/60 p-1.5 rounded border border-slate-800 leading-tight">
-                      {live.alerts[0]}
-                    </div>
-                  )}
-
-                  <a
-                    href={c.pr_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center justify-between pt-1"
-                  >
-                    <span>Inspect GitHub Live</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
-      {/* Contributions Timeline List */}
-      <div className="space-y-6">
-        {contributions.map((contrib) => {
-          const files = JSON.parse(contrib.files_changed || '[]');
-          const skills = JSON.parse(contrib.demonstrated_skills || '[]');
-          const isMerged = contrib.status === 'merged';
+      {/* PR Cards Grid / List (Modeled cleanly on Workspace Navigator ProjectCard) */}
+      <section
+        className={cn(
+          viewMode === 'grid'
+            ? 'grid grid-cols-1 gap-4 md:grid-cols-2'
+            : 'flex flex-col gap-2.5'
+        )}
+      >
+        {filteredContributions.map((contrib) => {
+          const live = liveReports[contrib.pr_number] || {};
+          const files = safeParseJson<string[]>(contrib.files_changed, []);
+          const skills = safeParseJson<string[]>(contrib.demonstrated_skills, []);
+          const masterclass = safeParseJson<any>(contrib.learning_breakdown, null);
+          const isMerged = contrib.status === 'merged' || live.is_merged;
           const isApproved = contrib.status === 'approved';
-          const isExpanded = !!expandedMasterclass[contrib.id];
-          const currentTab = activeTab[contrib.id] || 'blueprint';
+          const hasFailures = (live.ci_failed || 0) > 0;
+          const allPassed = live.ci_total > 0 && live.ci_passed === live.ci_total;
 
-          let masterclass: any = null;
-          try {
-            if (contrib.learning_breakdown) {
-              masterclass = typeof contrib.learning_breakdown === 'string' 
-                ? JSON.parse(contrib.learning_breakdown) 
-                : contrib.learning_breakdown;
-            }
-          } catch (e) {
-            console.error("Failed to parse learning_breakdown", e);
-          }
+          const ciTone = isMerged
+            ? 'violet'
+            : allPassed
+              ? 'emerald'
+              : hasFailures
+                ? 'amber'
+                : 'accent';
 
           return (
-            <div key={contrib.id} className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-6 space-y-5 shadow-lg">
-              {/* Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    isMerged ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' :
-                    isApproved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' :
-                    'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  }`}>
-                    {isMerged ? <GitMerge className="w-5 h-5" /> : <GitPullRequest className="w-5 h-5" />}
+            <article
+              key={contrib.id}
+              className={cn(
+                'group rounded-2xl border bg-[var(--surface)] shadow-apple transition-all duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] animate-fade-up',
+                viewMode === 'list'
+                  ? 'flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'
+                  : 'flex min-w-0 flex-col justify-between p-5 space-y-4'
+              )}
+            >
+              <div className={cn('min-w-0', viewMode === 'list' && 'flex-1 space-y-1')}>
+                {/* Top Metadata Badges */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone="accent" className="font-mono font-semibold">
+                      {isMerged ? <GitMerge className="h-3 w-3" /> : <GitPullRequest className="h-3 w-3" />}
+                      PR #{contrib.pr_number}
+                    </Badge>
+                    <Badge tone={ciTone} className="font-mono uppercase">
+                      {isMerged ? 'Merged' : isApproved ? 'Approved' : contrib.status}
+                    </Badge>
+                    {live.ci_total !== undefined && (
+                      <Badge tone={allPassed ? 'emerald' : hasFailures ? 'amber' : 'neutral'} className="font-mono">
+                        CI {live.ci_passed}/{live.ci_total}
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-blue-400 bg-blue-950/60 border border-blue-800/40 px-2 py-0.5 rounded">
-                        PR #{contrib.pr_number}
-                      </span>
-                      <h2 className="text-sm font-semibold text-white">{contrib.pr_title}</h2>
-                    </div>
-                    <div className="text-[11px] text-slate-400 font-mono mt-1">
-                      Branch: <span className="text-slate-300 font-semibold">{contrib.branch_name}</span> • Commits: {contrib.commits_count} • +{contrib.lines_added} / -{contrib.lines_deleted}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  <span className={`text-xs font-mono uppercase px-2.5 py-1 rounded border font-semibold ${
-                    isMerged ? 'bg-purple-950/80 text-purple-300 border-purple-800/40' :
-                    isApproved ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/40' :
-                    'bg-blue-950/80 text-blue-300 border-blue-800/40'
-                  }`}>
-                    {contrib.status}
+                  <span className="font-mono text-[11px] text-[var(--ink-muted)]">
+                    +{contrib.lines_added} / -{contrib.lines_deleted}
                   </span>
-                  <a
-                    href={contrib.pr_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 rounded text-slate-300 hover:text-white bg-[#162238] border border-[#253755] flex items-center gap-1 text-xs transition-colors"
-                  >
-                    <span>GitHub PR</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
                 </div>
-              </div>
 
-              {/* Maintainer Review Feedback */}
-              {contrib.review_feedback_summary && (
-                <div className="bg-[#162238] border border-[#253755] rounded-lg p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs text-amber-300 font-medium">
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Live CI & Maintainer Triage Status:</span>
-                  </div>
-                  <p className="text-xs text-slate-300">{contrib.review_feedback_summary}</p>
+                {/* PR Title */}
+                <button
+                  type="button"
+                  onClick={() => openMasterclassSheet(contrib)}
+                  className="block w-full text-left text-[15px] font-semibold leading-snug text-[var(--ink)] hover:text-[var(--accent-bright)] cursor-pointer"
+                >
+                  {contrib.pr_title}
+                </button>
+
+                {/* Branch & Alerts */}
+                <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-[var(--ink-muted)] truncate">
+                  <GitBranch className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{contrib.branch_name || 'main'}</span>
+                  <span>· {contrib.commits_count} commit(s)</span>
                 </div>
-              )}
 
-              {/* Modified Files & Skills */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2 border-t border-[#1e293b]">
-                <div>
-                  <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Subsystem Files Changed</span>
-                  <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-slate-300">
-                    {files.map((file: string, idx: number) => (
-                      <li key={idx} className="flex items-center gap-1.5 truncate">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                        <span className="truncate">{file}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Demonstrated Engineering Skills</span>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {skills.map((skill: string, idx: number) => (
-                      <span key={idx} className="text-[10px] bg-[#162238] text-slate-300 px-2 py-0.5 rounded border border-[#253755]">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Masterclass Expandable Section */}
-              {masterclass && (
-                <div className="pt-2 border-t border-[#1e293b]">
-                  <button
-                    onClick={() => toggleMasterclass(contrib.id)}
-                    className="w-full flex items-center justify-between p-3 rounded-lg bg-blue-950/30 hover:bg-blue-950/50 border border-blue-900/50 text-blue-300 text-xs font-semibold transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-blue-400" />
-                      <span>Engineer's Masterclass: How to Solve Without AI & Maintainer Defense</span>
-                    </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-4 p-5 rounded-lg bg-[#0d1527] border border-blue-900/40 space-y-5">
-                      {/* Sub-tabs */}
-                      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-                        <button
-                          onClick={() => setTab(contrib.id, 'blueprint')}
-                          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
-                            currentTab === 'blueprint' 
-                              ? 'bg-blue-600 text-white shadow' 
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                          }`}
-                        >
-                          1. How to Solve Without AI
-                        </button>
-                        <button
-                          onClick={() => setTab(contrib.id, 'rootcause')}
-                          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
-                            currentTab === 'rootcause' 
-                              ? 'bg-blue-600 text-white shadow' 
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                          }`}
-                        >
-                          2. Root Cause & Solution
-                        </button>
-                        <button
-                          onClick={() => setTab(contrib.id, 'testing')}
-                          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
-                            currentTab === 'testing' 
-                              ? 'bg-blue-600 text-white shadow' 
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                          }`}
-                        >
-                          3. Testing Strategy
-                        </button>
-                        <button
-                          onClick={() => setTab(contrib.id, 'interview')}
-                          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
-                            currentTab === 'interview' 
-                              ? 'bg-emerald-600 text-white shadow' 
-                              : 'text-emerald-400/80 hover:text-emerald-200 hover:bg-emerald-950/40'
-                          }`}
-                        >
-                          4. Maintainer Defense
-                        </button>
+                {viewMode === 'grid' && (
+                  <>
+                    {live.alerts && live.alerts.length > 0 && (
+                      <div className="mt-3 rounded-lg border bg-[var(--input-bg)] px-3 py-2 text-[11.5px] text-[var(--ink-secondary)]">
+                        {live.alerts[0]}
                       </div>
+                    )}
 
-                      {/* Tab 1: Blueprint */}
-                      {currentTab === 'blueprint' && (
-                        <div className="space-y-4">
-                          <div className="bg-[#121a2d] p-4 rounded-lg border border-slate-800 space-y-2">
-                            <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold flex items-center gap-1.5">
-                              <Terminal className="w-3.5 h-3.5" /> What Was Broken & Real World Impact
-                            </span>
-                            <p className="text-xs text-slate-200 leading-relaxed font-sans">
-                              {masterclass.what_was_broken}
-                            </p>
-                            <p className="text-xs text-slate-400 leading-relaxed italic border-t border-slate-800/80 pt-2">
-                              <strong className="text-slate-300 not-italic font-mono">Impact on Science:</strong> {masterclass.real_world_impact}
-                            </p>
-                          </div>
-
-                          <div className="space-y-2.5">
-                            <h4 className="text-xs font-mono uppercase font-bold text-amber-300 flex items-center gap-1.5">
-                              <Lightbulb className="w-3.5 h-3.5" /> Step-by-Step Blueprint to Solve Without AI
-                            </h4>
-                            <div className="space-y-2">
-                              {masterclass.how_to_solve_without_ai?.map((step: string, idx: number) => (
-                                <div key={idx} className="p-3 rounded-lg bg-[#141d30] border border-slate-800 text-xs text-slate-200 flex gap-3">
-                                  <span className="font-mono text-blue-400 font-bold shrink-0">{idx + 1}.</span>
-                                  <div className="leading-relaxed font-sans">{step}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 2: Root Cause & Code Fix */}
-                      {currentTab === 'rootcause' && (
-                        <div className="space-y-4">
-                          <div className="bg-[#121a2d] p-4 rounded-lg border border-slate-800 space-y-2">
-                            <span className="text-[10px] font-mono text-purple-400 uppercase font-semibold flex items-center gap-1.5">
-                              <Cpu className="w-3.5 h-3.5" /> Technical Root Cause Analysis
-                            </span>
-                            <p className="text-xs text-slate-200 leading-relaxed">
-                              {masterclass.root_cause_analysis}
-                            </p>
-                          </div>
-
-                          <div className="bg-[#121a2d] p-4 rounded-lg border border-slate-800 space-y-2">
-                            <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold flex items-center gap-1.5">
-                              <ShieldCheck className="w-3.5 h-3.5" /> The Solution & Why Each Line Was Written
-                            </span>
-                            <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed font-sans">
-                              {masterclass.code_solution_explained}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 3: Testing & Verification */}
-                      {currentTab === 'testing' && (
-                        <div className="space-y-4">
-                          <div className="bg-[#121a2d] p-4 rounded-lg border border-slate-800 space-y-2">
-                            <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold flex items-center gap-1.5">
-                              <Terminal className="w-3.5 h-3.5" /> Testing & Verification Strategy
-                            </span>
-                            <p className="text-xs text-slate-200 whitespace-pre-line leading-relaxed">
-                              {masterclass.testing_strategy}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tab 4: Interview & Talking Points */}
-                      {currentTab === 'interview' && (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-mono uppercase font-bold text-emerald-400 flex items-center gap-1.5">
-                            <ShieldCheck className="w-3.5 h-3.5" /> Maintainer Defense & Interview Talking Points
-                          </h4>
-                          <p className="text-xs text-slate-400">
-                            If a GSoC mentor or interviewer asks: <span className="text-slate-200 italic">"Can you explain your contribution to this repository?"</span>, state these 3 concise points:
-                          </p>
-                          <div className="space-y-2">
-                            {masterclass.interview_talking_points?.map((point: string, idx: number) => (
-                              <div key={idx} className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-200 flex gap-2.5 items-start">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                                <span>{point}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {/* Files & Skills Preview */}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {files.slice(0, 2).map((f, i) => (
+                        <Badge key={i} tone="neutral" className="font-mono text-[10.5px] max-w-full truncate">
+                          {f}
+                        </Badge>
+                      ))}
+                      {skills.slice(0, 3).map((s, i) => (
+                        <Badge key={`sk-${i}`} tone="accent" className="text-[10.5px]">
+                          {s}
+                        </Badge>
+                      ))}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+
+              {/* Card Footer Actions */}
+              <div
+                className={cn(
+                  'flex items-center gap-2 shrink-0',
+                  viewMode === 'grid' && 'border-t pt-3 justify-between'
+                )}
+              >
+                {masterclass ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => openMasterclassSheet(contrib)}
+                    className={viewMode === 'grid' ? 'flex-1' : ''}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Open Masterclass</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openMasterclassSheet(contrib)}
+                    className={viewMode === 'grid' ? 'flex-1' : ''}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Inspect Details</span>
+                  </Button>
+                )}
+
+                <a
+                  href={contrib.pr_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-lg border bg-[var(--surface-elevated)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink-secondary)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
+                >
+                  <span>GitHub</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </article>
           );
         })}
-      </div>
+      </section>
+
+      {/* Slide-Over Masterclass & Inspection Sheet (Workspace Navigator PreviewSheet UX) */}
+      <Sheet
+        open={Boolean(selectedPR)}
+        onClose={() => setSelectedPR(null)}
+        eyebrow={selectedPR ? `PR #${selectedPR.pr_number} · ${selectedPR.branch_name || 'upstream'}` : undefined}
+        title={selectedPR?.pr_title || ''}
+        subtitle={selectedPR?.pr_url}
+        widthClass="max-w-[780px]"
+        headerActions={
+          selectedPR && (
+            <>
+              <Badge tone={selectedLive.is_merged || selectedPR.status === 'merged' ? 'violet' : 'emerald'}>
+                Status: {selectedLive.is_merged ? 'Merged' : selectedPR.status}
+              </Badge>
+              {selectedLive.ci_total !== undefined && (
+                <Badge tone={selectedLive.ci_passed === selectedLive.ci_total ? 'emerald' : 'amber'}>
+                  CI Checks: {selectedLive.ci_passed}/{selectedLive.ci_total} passing
+                </Badge>
+              )}
+              <a
+                href={selectedPR.pr_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto inline-flex min-h-[32px] items-center gap-1.5 rounded-lg border bg-[var(--surface)] px-3 text-[12px] font-semibold text-[var(--accent-bright)] hover:border-[var(--border-strong)]"
+              >
+                <span>Open on GitHub</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </>
+          )
+        }
+      >
+        {selectedPR && (
+          <div className="space-y-5">
+            {selectedPR.review_feedback_summary && (
+              <div className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 space-y-1">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--amber)]">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span>Live CI &amp; Maintainer Triage Status</span>
+                </div>
+                <p className="text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
+                  {selectedPR.review_feedback_summary}
+                </p>
+              </div>
+            )}
+
+            {/* Changed Files & Skills */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 space-y-2">
+                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                  Subsystem Files Changed
+                </div>
+                <ul className="space-y-1 font-mono text-[11.5px] text-[var(--ink-secondary)]">
+                  {selectedFiles.map((file, idx) => (
+                    <li key={idx} className="truncate">
+                      • {file}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 space-y-2">
+                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
+                  Demonstrated Skills
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedSkills.map((skill, idx) => (
+                    <Badge key={idx} tone="accent">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 4-Tab Engineer's Masterclass */}
+            {selectedMasterclass && (
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex flex-wrap items-center gap-1.5 rounded-xl border bg-[var(--input-bg)] p-1">
+                  {[
+                    { id: 'blueprint', label: '1. Solve Without AI' },
+                    { id: 'rootcause', label: '2. Root Cause & Fix' },
+                    { id: 'testing', label: '3. Testing Strategy' },
+                    { id: 'interview', label: '4. Maintainer Defense' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setMasterclassTab(tab.id as any)}
+                      className={cn(
+                        'flex-1 rounded-lg px-2.5 py-2 font-mono text-[11.5px] font-semibold transition-colors cursor-pointer whitespace-nowrap',
+                        masterclassTab === tab.id
+                          ? 'bg-[var(--surface)] text-[var(--ink)] shadow-apple border border-[var(--border-hairline)]'
+                          : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {masterclassTab === 'blueprint' && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border bg-[var(--surface-elevated)] p-4 space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+                        <Terminal className="h-3.5 w-3.5" />
+                        <span>What Was Broken &amp; Real World Impact</span>
+                      </div>
+                      <p className="text-[12.5px] leading-relaxed text-[var(--ink)]">
+                        {selectedMasterclass.what_was_broken}
+                      </p>
+                      <p className="border-t pt-2 text-[12px] italic leading-relaxed text-[var(--ink-muted)]">
+                        <strong className="not-italic text-[var(--ink-secondary)]">Impact:</strong>{' '}
+                        {selectedMasterclass.real_world_impact}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--amber)]">
+                        <Lightbulb className="h-3.5 w-3.5" />
+                        <span>Step-by-Step Blueprint to Solve Without AI</span>
+                      </div>
+                      {selectedMasterclass.how_to_solve_without_ai?.map((step: string, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex gap-3 rounded-xl border bg-[var(--surface)] p-3 text-[12.5px] leading-relaxed text-[var(--ink-secondary)]"
+                        >
+                          <span className="font-mono font-bold text-[var(--accent-bright)] shrink-0">
+                            {idx + 1}.
+                          </span>
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {masterclassTab === 'rootcause' && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border bg-[var(--surface-elevated)] p-4 space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--violet)]">
+                        <Cpu className="h-3.5 w-3.5" />
+                        <span>Technical Root Cause Analysis</span>
+                      </div>
+                      <p className="text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
+                        {selectedMasterclass.root_cause_analysis}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border bg-[var(--surface-elevated)] p-4 space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--emerald)]">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>Solution &amp; Line-by-Line Rationale</span>
+                      </div>
+                      <p className="whitespace-pre-line text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
+                        {selectedMasterclass.code_solution_explained}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {masterclassTab === 'testing' && (
+                  <div className="rounded-xl border bg-[var(--surface-elevated)] p-4 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+                      <Terminal className="h-3.5 w-3.5" />
+                      <span>Testing &amp; Verification Strategy</span>
+                    </div>
+                    <p className="whitespace-pre-line text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
+                      {selectedMasterclass.testing_strategy}
+                    </p>
+                  </div>
+                )}
+
+                {masterclassTab === 'interview' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--emerald)]">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>Maintainer Defense &amp; Interview Talking Points</span>
+                    </div>
+                    <p className="text-[12px] text-[var(--ink-muted)]">
+                      If a GSoC mentor asks:{' '}
+                      <span className="italic text-[var(--ink)]">
+                        "Can you walk me through your contribution to this repository?"
+                      </span>
+                    </p>
+                    <div className="space-y-2">
+                      {selectedMasterclass.interview_talking_points?.map((point: string, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2.5 rounded-xl border border-[color:var(--emerald)]/30 bg-[var(--emerald-soft)] p-3 text-[12.5px] text-[var(--ink)]"
+                        >
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--emerald)]" />
+                          <span>{point}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 };

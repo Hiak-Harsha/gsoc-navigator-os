@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { FileText, Play, CheckCircle2, AlertTriangle, Calendar, Layers, ShieldCheck } from 'lucide-react';
+import { Calendar, CheckCircle2, FileText, Play } from 'lucide-react';
+import { Badge } from '../components/ui/Badge';
+import { ShimmerButton } from '../components/magic/ShimmerButton';
+import { cn, safeParseJson } from '../lib/utils';
 
-export const ProposalStudioView: React.FC = () => {
+export interface ProposalStudioViewProps {
+  showToast?: (msg: string, error?: boolean) => void;
+}
+
+export const ProposalStudioView: React.FC<ProposalStudioViewProps> = ({ showToast }) => {
   const [proposals, setProposals] = useState<any[]>([]);
   const [activeProposal, setActiveProposal] = useState<any>(null);
   const [auditResult, setAuditResult] = useState<any>(null);
@@ -35,132 +42,182 @@ export const ProposalStudioView: React.FC = () => {
       const res = await api.auditProposal(activeProposal.id);
       setAuditResult(res);
       setActiveProposal({ ...activeProposal, review_score: res.review_score });
+      showToast?.(`Proposal audited · Review score ${res.review_score}%`);
     } catch (err) {
       console.error(err);
+      showToast?.('Proposal audit failed', true);
     } finally {
       setIsAuditing(false);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-slate-400 font-mono text-sm">Loading Proposal Studio...</div>;
+    return (
+      <div className="rounded-xl border bg-[var(--surface)] py-20 text-center text-sm text-[var(--ink-muted)] shadow-apple">
+        Loading Proposal Development Studio...
+      </div>
+    );
   }
 
-  const milestones = activeProposal ? JSON.parse(activeProposal.weekly_milestones || '[]') : [];
+  const milestones = activeProposal ? safeParseJson<any[]>(activeProposal.weekly_milestones, []) : [];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Title */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">GSoC Proposal Development Studio</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Author technical GSoC proposals, structure week-by-week milestones with buffer periods, and run critical peer audits.
-          </p>
+    <div className="space-y-5 animate-fade-up">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-[var(--surface)] p-5 shadow-apple">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-bright)]">
+            <FileText className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-[var(--ink)]">
+              GSoC Proposal Development Studio
+            </h1>
+            <p className="mt-0.5 text-[12.5px] text-[var(--ink-muted)]">
+              Author technical GSoC proposals, structure week-by-week deliverables with buffers, and run critical peer audits.
+            </p>
+          </div>
         </div>
 
-        {activeProposal && (
-          <button
-            onClick={handleRunAudit}
-            disabled={isAuditing}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-sm"
-          >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>{isAuditing ? 'Auditing Proposal...' : 'Run Critical Audit'}</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {proposals.length > 1 && (
+            <div className="inline-flex rounded-lg border bg-[var(--input-bg)] p-1">
+              {proposals.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveProposal(p);
+                    setAuditResult(null);
+                  }}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-[12px] font-medium cursor-pointer',
+                    activeProposal?.id === p.id
+                      ? 'bg-[var(--surface)] text-[var(--ink)] shadow-apple'
+                      : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                  )}
+                >
+                  Draft #{p.id}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeProposal && (
+            <ShimmerButton onClick={handleRunAudit} disabled={isAuditing}>
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>{isAuditing ? 'Auditing...' : 'Run Critical Audit'}</span>
+            </ShimmerButton>
+          )}
+        </div>
       </div>
 
       {activeProposal && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Proposal Body */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
-                <h2 className="text-base font-bold text-white">{activeProposal.title}</h2>
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/40 px-2.5 py-1 rounded">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-5">
+            <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3.5">
+                <h2 className="text-[16px] font-bold text-[var(--ink)]">{activeProposal.title}</h2>
+                <Badge tone="emerald" className="font-mono font-bold">
                   Score: {activeProposal.review_score}%
-                </span>
+                </Badge>
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="space-y-3.5">
                 <div>
-                  <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold">Problem Statement</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed bg-[#162238] p-3 rounded border border-[#253755]">
+                  <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+                    Problem Statement
+                  </div>
+                  <p className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
                     {activeProposal.problem_statement}
                   </p>
                 </div>
 
                 <div>
-                  <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold">Proposed Solution & Architecture</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed bg-[#162238] p-3 rounded border border-[#253755]">
+                  <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--accent-bright)]">
+                    Proposed Solution &amp; Architecture
+                  </div>
+                  <p className="rounded-xl border bg-[var(--surface-elevated)] p-3.5 text-[12.5px] leading-relaxed text-[var(--ink-secondary)]">
                     {activeProposal.proposed_solution}
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Week-by-Week Milestones */}
-            <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 border-b border-[#1e293b] pb-3">
-                <Calendar className="w-4 h-4 text-purple-400" />
-                <h2 className="text-sm font-semibold text-white">Timeline & Weekly Deliverables</h2>
+            {/* Milestones */}
+            <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-4">
+              <div className="flex items-center gap-2 border-b pb-3">
+                <Calendar className="h-4 w-4 text-[var(--violet)]" />
+                <h2 className="text-[14px] font-semibold text-[var(--ink)]">Timeline &amp; Weekly Deliverables</h2>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {milestones.map((m: any, idx: number) => {
-                  const isBuffer = m.milestone.toLowerCase().includes('buffer');
+                  const isBuffer = String(m.milestone || '').toLowerCase().includes('buffer');
                   return (
                     <div
                       key={idx}
-                      className={`p-3.5 rounded-lg border text-xs space-y-1.5 ${
-                        isBuffer ? 'bg-amber-950/30 border-amber-800/50' : 'bg-[#162238] border-[#253755]'
-                      }`}
+                      className={cn(
+                        'rounded-xl border p-3.5 space-y-1.5',
+                        isBuffer
+                          ? 'border-[color:var(--amber)]/40 bg-[var(--amber-soft)]'
+                          : 'bg-[var(--surface-elevated)]'
+                      )}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">Week {m.week}: {m.milestone}</span>
-                        {isBuffer && (
-                          <span className="text-[10px] font-mono text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded border border-amber-700">
-                            Risk Buffer Week
-                          </span>
-                        )}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[13px] font-semibold text-[var(--ink)]">
+                          Week {m.week}: {m.milestone}
+                        </span>
+                        {isBuffer && <Badge tone="amber">Risk Buffer Week</Badge>}
                       </div>
-                      <div className="text-slate-300 font-mono text-[11px]">Deliverables: {m.deliverables}</div>
-                      <div className="text-slate-400 font-mono text-[10px]">Verification: {m.tests}</div>
+                      <div className="font-mono text-[11.5px] text-[var(--ink-secondary)]">
+                        Deliverables: {m.deliverables}
+                      </div>
+                      <div className="font-mono text-[10.5px] text-[var(--ink-muted)]">
+                        Verification: {m.tests}
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Right Column: Audit Feedback & Quality Checklist */}
-          <div className="space-y-6">
-            <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-white">Critical Audit Feedback</h3>
-
+          <div className="space-y-5">
+            <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-3.5">
+              <h3 className="text-[14px] font-semibold text-[var(--ink)] border-b pb-2.5">
+                Critical Audit Feedback
+              </h3>
               {auditResult ? (
-                <div className="space-y-3 text-xs">
-                  <div className="bg-[#162238] border border-[#253755] p-3 rounded text-slate-200">
+                <div className="space-y-3">
+                  <div className="rounded-xl border bg-[var(--surface-elevated)] p-3 text-[12.5px] text-[var(--ink)]">
                     {auditResult.readiness_summary}
                   </div>
-
-                  {auditResult.audit_warnings.length > 0 && (
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">Warnings to Address</span>
+                  {auditResult.audit_warnings?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--amber)]">
+                        Warnings to Address
+                      </div>
                       {auditResult.audit_warnings.map((w: string, i: number) => (
-                        <div key={i} className="text-xs text-amber-200 bg-amber-950/40 p-2 rounded border border-amber-800/40">
+                        <div
+                          key={i}
+                          className="rounded-xl border border-[color:var(--amber)]/35 bg-[var(--amber-soft)] p-2.5 text-[12px] text-[var(--ink)]"
+                        >
                           • {w}
                         </div>
                       ))}
                     </div>
                   )}
-
-                  {auditResult.strengths.length > 0 && (
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">Strengths</span>
+                  {auditResult.strengths?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--emerald)]">
+                        Strengths
+                      </div>
                       {auditResult.strengths.map((s: string, i: number) => (
-                        <div key={i} className="text-xs text-emerald-300 bg-emerald-950/40 p-2 rounded border border-emerald-800/40">
+                        <div
+                          key={i}
+                          className="rounded-xl border border-[color:var(--emerald)]/30 bg-[var(--emerald-soft)] p-2.5 text-[12px] text-[var(--ink)]"
+                        >
                           • {s}
                         </div>
                       ))}
@@ -168,33 +225,30 @@ export const ProposalStudioView: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-slate-500 py-4">
-                  Run critical audit to evaluate buffer weeks, milestone specificity, and mentor score.
-                </div>
+                <p className="py-4 text-[12.5px] text-[var(--ink-muted)]">
+                  Run critical audit to evaluate buffer weeks, milestone specificity, and mentor readiness score.
+                </p>
               )}
-            </div>
+            </section>
 
-            <div className="bg-[#121a2d] border border-[#1e293b] rounded-xl p-5 space-y-3 text-xs">
-              <h3 className="text-sm font-semibold text-white">Proposal Checklist</h3>
-              <ul className="space-y-2 text-slate-300">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Problem statement grounded in actual code</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>12-week structured milestones</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Buffer week included for risk mitigation</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Linked prior merged/open PRs</span>
-                </li>
+            <section className="rounded-2xl border bg-[var(--surface)] p-5 shadow-apple space-y-3">
+              <h3 className="text-[14px] font-semibold text-[var(--ink)] border-b pb-2.5">
+                Proposal Checklist
+              </h3>
+              <ul className="space-y-2 text-[12.5px] text-[var(--ink-secondary)]">
+                {[
+                  'Problem statement grounded in actual code',
+                  '12-week structured milestones',
+                  'Buffer week included for risk mitigation',
+                  'Linked prior merged/open PRs',
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--emerald)]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
               </ul>
-            </div>
+            </section>
           </div>
         </div>
       )}
