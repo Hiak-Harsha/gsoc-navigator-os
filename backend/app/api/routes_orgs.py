@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.organization import Organization, Repository
 from app.schemas.organization import OrganizationOut, OrgComparisonRequest
 from app.services.org_matcher import org_matcher
+from app.services.portfolio_seed import ensure_cern_org_seeded
 from app.api.routes_profile import get_or_create_default_user
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
@@ -46,6 +47,7 @@ def seed_organizations_if_empty(db: Session, user):
             existing.skill_gaps = json.dumps(fit["skill_gaps"])
             existing.suggested_strategy = fit["suggested_strategy"]
             db.commit()
+    ensure_cern_org_seeded(db)
 
 @router.get("", response_model=List[OrganizationOut])
 def list_organizations(db: Session = Depends(get_db)):

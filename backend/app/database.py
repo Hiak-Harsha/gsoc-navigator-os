@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from datetime import datetime, timezone
 from app.config import settings
 
 # SQLite connection arguments for concurrency
@@ -25,7 +26,7 @@ def init_db():
     from app import models # noqa: F401
     Base.metadata.create_all(bind=engine)
 
-    # Safe evolution for SQLite columns
+    # Safe evolution and NULL-timestamp backfill for SQLite columns
     if settings.DATABASE_URL.startswith("sqlite"):
         try:
             with engine.connect() as conn:
@@ -47,6 +48,12 @@ def init_db():
                 existing_c_cols = [row[1] for row in res_c.fetchall()]
                 if "learning_breakdown" not in existing_c_cols:
                     conn.exec_driver_sql("ALTER TABLE contributions ADD COLUMN learning_breakdown TEXT")
+
+                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                for tbl in ("organizations", "contributions"):
+                    conn.exec_driver_sql(f"UPDATE {tbl} SET created_at = :now WHERE created_at IS NULL", {"now": now_str})
+                    conn.exec_driver_sql(f"UPDATE {tbl} SET updated_at = :now WHERE updated_at IS NULL", {"now": now_str})
+                conn.exec_driver_sql("UPDATE contributions SET recurring_weaknesses_identified = '[]' WHERE recurring_weaknesses_identified IS NULL")
 
                 conn.commit()
         except Exception as e:
